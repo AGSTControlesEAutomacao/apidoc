@@ -45,10 +45,10 @@ info:
     4. Inclua o token nas requisições autenticadas
 
 servers:
-  - url: "https://brise.agst.com.br/api/v3"
-    description: Servidor de Produção
-  - url: "https://intranet.agst.com.br:8090/api/v3"
+  - url: "https://sandbox.brise.agst.com.br:8433/api/v3"
     description: Servidor local de desenvolvimento
+  - url: "https://api.brise.agst.com.br/api/v3"
+    description: Servidor de Produção
 
 tags:
   - name: Usuários
@@ -761,13 +761,12 @@ paths:
         - Corporações
       summary: Adicionar membro à corporação
       description: |
-        Adiciona um novo membro a uma corporação, criando um novo usuário (se ainda não existir) ou vinculando um usuário já registrado no sistema Brise Cloud.
+        Adiciona um novo membro a uma corporação.  
 
-        - Se o usuário ainda **não existir**, será criado com `user_status = pending` (aguardando ativação da conta) e o vínculo já ativo (`member_status = active`).  
-        - Se o usuário já **existir**, será vinculado inicialmente com `member_status = pending`, aguardando a aceitação do convite.  
-        - O vínculo só se torna efetivo quando o usuário aceita o convite, momento em que `member_status = active`.  
+        Caso o e-mail informado ainda **não esteja registrado**, cria um novo usuário com `user_status = pending`.  
+        Em ambos os casos, o vínculo será criado inicialmente com `member_status = pending`.  
 
-        O `user_status` representa o estado da conta do usuário no sistema, enquanto o `member_status` representa apenas a relação do usuário com a corporação.  
+        O usuário só passa a integrar efetivamente a corporação após confirmar o e-mail e posterior aceitar o convite.
 
         > ⚠️ **Nota:** 
         > Apenas usuários **administradores** da corporação podem adicionar novos membros.
