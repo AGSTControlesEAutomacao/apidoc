@@ -45,10 +45,10 @@ info:
     4. Inclua o token nas requisições autenticadas
 
 servers:
-  - url: "https://brise.agst.com.br/api/v3"
-    description: Servidor de Produção
-  - url: "https://intranet.agst.com.br:8090/api/v3"
+  - url: "https://sandbox.brise.agst.com.br:8433/api/v3"
     description: Servidor local de desenvolvimento
+  - url: "https://api.brise.agst.com.br/api/v3"
+    description: Servidor de Produção
 
 tags:
   - name: Usuários
