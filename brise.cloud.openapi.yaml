@@ -39,13 +39,13 @@ info:
     <!-- ReDoc-Inject: <security-definitions> -->
 
     ## 🚀 Primeiros Passos
-    1. Registre seu aplicativo no [Portal de Desenvolvedores](https://brise.agst.com.br/api/v3/sp/application.html)
+    1. Registre seu aplicativo no [Portal de Desenvolvedores](https://brise.agst.com.br:8443/api/v3/sp/application.html) e [Portal de Desenvolvedores Sandbox](https://sandbox.brise.agst.com.br:8443/api/v3/sp/application.html)
     2. Obtenha `client_id` e `client_secret`
     3. Inicie o fluxo OAuth2 ou gere um JWT
     4. Inclua o token nas requisições autenticadas
 
 servers:
-  - url: "https://sandbox.brise.agst.com.br:8433/api/v3"
+  - url: "https://sandbox.brise.agst.com.br:8443/api/v3"
     description: Servidor local de desenvolvimento
   - url: "https://api.brise.agst.com.br/api/v3"
     description: Servidor de Produção
