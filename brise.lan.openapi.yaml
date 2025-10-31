@@ -32,8 +32,175 @@ info:
 
     Para integrações híbridas, combine esta API com a **Brise Cloud API** e mantenha o controle local com supervisão remota.
 
+    # 🔐 Autenticação
+
+    Este tópico descreve os métodos de autenticação disponíveis e como utilizá-los.  
+
+    <!-- ReDoc-Inject: <security-definitions> -->
+
 servers:
   - url: "http://{device-ip}/api/v3"
     description: Dispositivo Brise na rede local (substitua {device-ip})
 
-paths: {}
+tags:
+  - name: Rede
+    description: Operações relacionadas à configuração e status da rede do dispositivo Brise.
+
+paths:
+  /network/wifi:
+    put:
+      tags:
+        - Rede
+      summary: Configura Wi-Fi
+      description: |
+        Define o SSID e a senha da rede Wi-Fi à qual o dispositivo Brise deve se conectar.  
+        Após a atualização, o dispositivo tentará conectar automaticamente à nova rede.
+
+        > ⚠️ Durante o processo de troca de rede, a conexão atual será interrompida.  
+        > O dispositivo aplicará as novas credenciais e reiniciará o módulo de rede.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ssid
+                - password
+              properties:
+                ssid:
+                  type: string
+                  description: Nome da rede Wi-Fi (SSID)
+                  example: "RedeBrise"
+                password:
+                  type: string
+                  description: Senha da rede Wi-Fi
+                  example: "12345678"
+      responses:
+        "200":
+          description: Configuração aplicada com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+              examples:
+                sucesso:
+                  summary: Exemplo de sucesso
+                  value:
+                    success: true
+        "400":
+          description: Requisição inválida. Verifique os dados enviados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - Rede
+      summary: Lista redes Wi-Fi
+      description: |
+        Retorna a lista mais recente de redes Wi-Fi detectadas pelo dispositivo.  
+        O dispositivo executa varreduras automáticas periodicamente (a cada 30 segundos), mantendo a lista atualizada em cache.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista de redes encontradas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  networks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ssid:
+                          type: string
+                          example: "RedeBrise"
+                        rssi:
+                          type: integer
+                          example: -62
+                        security:
+                          type: string
+                          example: "WPA2"
+                        channel:
+                          type: integer
+                          example: 6
+              examples:
+                exemplo:
+                  summary: Exemplo de resposta
+                  value:
+                    networks:
+                      - ssid: "RedeBrise"
+                        rssi: -62
+                        security: "WPA2"
+                        channel: 6
+                      - ssid: "RedeAGST"
+                        rssi: -78
+                        security: "WPA3"
+                        channel: 11
+  /network/wifi/scan:
+    post:
+      tags:
+        - Rede
+      summary: Scan Wi-Fi
+      description: |
+        Solicita ao dispositivo que execute imediatamente uma nova varredura Wi-Fi, atualizando o cache de redes observadas.  
+
+        > 🕒 A operação é assíncrona: a lista pode levar alguns segundos para refletir as novas redes detectadas.  
+        > Use `GET /network/wifi` para verificar quando o cache for atualizado.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Varredura iniciada com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+              examples:
+                sucesso:
+                  summary: Exemplo de sucesso
+                  value:
+                    success: true
+        "409":
+          description: Já existe uma varredura em andamento
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: ALREADY_IN_PROGRESS
+components:
+  securitySchemes:
+    bearerAuth:
+      title: Bearer Authentication
+      type: http
+      scheme: bearer
+      description: |
+        O token de acesso deve ser enviado no cabeçalho `Authorization` da sua requisição autenticadas.
+
+        ```
+        Authorization: Bearer <seu-token>
+        ```
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: INVALID_REQUEST
