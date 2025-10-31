@@ -72,15 +72,15 @@ paths:
               properties:
                 ssid:
                   type: string
-                  description: Nome da rede Wi-Fi (SSID)
+                  description: Nome da rede Wi-Fi (SSID) à qual o dispositivo deve se conectar.
                   example: "RedeBrise"
                 password:
                   type: string
-                  description: Senha da rede Wi-Fi
+                  description: Senha da rede Wi-Fi. Deve conter entre 8 e 63 caracteres para redes WPA/WPA2/WPA3.
                   example: "12345678"
       responses:
         "200":
-          description: Configuração aplicada com sucesso
+          description: Configuração aplicada com sucesso.
           content:
             application/json:
               schema:
@@ -88,6 +88,7 @@ paths:
                 properties:
                   success:
                     type: boolean
+                    description: Indica se a configuração foi aplicada corretamente.
                     example: true
               examples:
                 sucesso:
@@ -111,33 +112,44 @@ paths:
         - bearerAuth: []
       responses:
         "200":
-          description: Lista de redes encontradas
+          description: Lista de redes encontradas.
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  last_scan:
+                    type: string
+                    format: date-time
+                    description: Data e hora da última varredura concluída com sucesso (UTC).
+                    example: "2025-10-31T10:22:15Z"
                   networks:
                     type: array
+                    description: Lista de redes Wi-Fi detectadas durante a última varredura.
                     items:
                       type: object
                       properties:
                         ssid:
                           type: string
+                          description: Nome (SSID) da rede detectada.
                           example: "RedeBrise"
                         rssi:
                           type: integer
+                          description: Intensidade do sinal em dBm. Valores mais negativos indicam sinal mais fraco.
                           example: -62
                         security:
                           type: string
+                          description: Tipo de segurança da rede (ex: `WPA2`, `WPA3`, `Open`).
                           example: "WPA2"
                         channel:
                           type: integer
+                          description: Canal Wi-Fi no qual a rede foi detectada.
                           example: 6
               examples:
                 exemplo:
                   summary: Exemplo de resposta
                   value:
+                    last_scan: "2025-10-31T10:22:15Z"
                     networks:
                       - ssid: "RedeBrise"
                         rssi: -62
@@ -161,7 +173,7 @@ paths:
         - bearerAuth: []
       responses:
         "200":
-          description: Varredura iniciada com sucesso
+          description: Varredura iniciada com sucesso.
           content:
             application/json:
               schema:
@@ -169,14 +181,21 @@ paths:
                 properties:
                   success:
                     type: boolean
+                    description: Indica se a solicitação foi aceita.
                     example: true
+                  started_at:
+                    type: string
+                    format: date-time
+                    description: Data e hora de início da varredura (UTC).
+                    example: "2025-10-31T10:21:00Z"
               examples:
                 sucesso:
                   summary: Exemplo de sucesso
                   value:
                     success: true
+                    started_at: "2025-10-31T10:21:00Z"
         "409":
-          description: Já existe uma varredura em andamento
+          description: Já existe uma varredura em andamento.
           content:
             application/json:
               schema:
@@ -184,7 +203,9 @@ paths:
                 properties:
                   error:
                     type: string
+                    description: Código do erro indicando que uma operação de varredura já está em execução.
                     example: ALREADY_IN_PROGRESS
+
 components:
   securitySchemes:
     bearerAuth:
@@ -192,7 +213,7 @@ components:
       type: http
       scheme: bearer
       description: |
-        O token de acesso deve ser enviado no cabeçalho `Authorization` da sua requisição autenticadas.
+        O token de acesso deve ser enviado no cabeçalho `Authorization` da sua requisição autenticada.
 
         ```
         Authorization: Bearer <seu-token>
@@ -203,4 +224,5 @@ components:
       properties:
         error:
           type: string
+          description: Código de erro representando o tipo de falha da requisição.
           example: INVALID_REQUEST
