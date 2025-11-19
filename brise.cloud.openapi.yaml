@@ -164,20 +164,33 @@ paths:
       summary: Criar usuário
       description: |
         Registra um novo usuário no sistema Brise Cloud.
-        Requer validação de **hCaptcha** para prevenir abuso automatizado (bots, scripts, etc.).
+        Requer validação anti-bot via **hCaptcha** ou **Cloudflare Turnstile** (pelo menos um dos dois tokens deve ser enviado) para prevenir abuso automatizado (bots, scripts, etc.).
 
         > ℹ️ **Fluxo:**  
         >- Um token de ativação é enviado para o e-mail informado.  
         >- A conta é criada com status `pending` até que o usuário clique no link de ativação.  
 
-        > 🛡️ **Segurança:**  
-        >- Este endpoint exige o parâmetro `h-captcha-response` (gerado pelo widget do hCaptcha).  
-        >- A verificação é feita server-side junto à API do hCaptcha (`https://api.hcaptcha.com/siteverify`).  
+        > 🛡️ **Segurança [Proteção anti-bot]:**  
+        >- Este endpoint exige o parâmetro `h-captcha-response` ou `cf-turnstile-response` (gerado pelo widget do dos serviços).  
+        >- A verificação é feita server-side junto às APIs: 
+        >  - hCaptcha → `https://api.hcaptcha.com/siteverify`.  
+        >  - Cloudflare Turnstile → `https://challenges.cloudflare.com/turnstile/v0/siteverify`.  
 
         > 📌 **Integração frontend:**  
-        >- Inclua o script `<script src="https://js.hcaptcha.com/1/api.js" async defer></script>`  
-        >- Adicione `<div class="h-captcha" data-sitekey="SEU_SITEKEY"></div>` no formulário  
-        >- O token será enviado automaticamente como campo `h-captcha-response` no POST
+        > Inclua o script:
+
+        **hCaptcha**
+        ```html
+        <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+        <div class="h-captcha" data-sitekey="SEU_SITEKEY_HCAPTCHA"></div>
+        ```
+
+        **Cloudflare Turnstile**
+        ```html
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+        <div class="cf-turnstile" data-sitekey="SEU_SITEKEY_TURNSTILE"></div>
+        ```
+
       operationId: createUserPublic
       requestBody:
         description: Dados do usuário e resposta do hCaptcha
@@ -190,7 +203,6 @@ paths:
                 - email
                 - full_name
                 - password
-                - h-captcha-response
               properties:
                 email:
                   type: string
@@ -207,6 +219,14 @@ paths:
                   type: string
                   description: Token retornado pelo widget do hCaptcha após resolução bem-sucedida
                   example: "03AGdBq24PcL...[token truncado]"
+                cf-turnstile-response:
+                  type: string
+                  description: Token retornado pelo widget do Cloudflare Turnstile após resolução bem-sucedida
+                  example: "0x4AAAAAAABgjUkJ1j5rPvHX...[token truncado]"
+              oneOf:
+                - required: [h-captcha-response]
+                - required: [cf-turnstile-response]
+              minProperties: 4
             examples:
               createUserPublicRequest:
                 summary: Exemplo de requisição com hCaptcha
