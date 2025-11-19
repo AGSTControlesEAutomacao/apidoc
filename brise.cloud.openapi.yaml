@@ -1,7 +1,7 @@
 openapi: 3.0.4
 info:
   title: Brise Cloud API
-  version: 3.0.0
+  version: 3.0.1
   contact:
     name: AGST
     email: ped@agst.com.br
@@ -531,6 +531,17 @@ paths:
                     type: string
                     example: INVALID_TOKEN
                     enum: [INVALID_TOKEN, EXPIRED_TOKEN, USER_NOT_FOUND]
+        "402":
+          description: |
+            Assinatura necessária para acessar este recurso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: SUBSCRIPTION_REQUIRED
 
   /corporations:
     post:
