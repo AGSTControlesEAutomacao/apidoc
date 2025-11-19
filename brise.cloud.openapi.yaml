@@ -1,7 +1,7 @@
 openapi: 3.0.4
 info:
   title: Brise Cloud API
-  version: 3.0.0
+  version: 3.0.1
   contact:
     name: AGST
     email: ped@agst.com.br
@@ -39,13 +39,13 @@ info:
     <!-- ReDoc-Inject: <security-definitions> -->
 
     ## 🚀 Primeiros Passos
-    1. Registre seu aplicativo no [Portal de Desenvolvedores](https://brise.agst.com.br/api/v3/sp/application.html)
+    1. Registre seu aplicativo no [Portal de Desenvolvedores](https://brise.agst.com.br:8443/api/v3/sp/application.html) e [Portal de Desenvolvedores Sandbox](https://sandbox.brise.agst.com.br:8443/api/v3/sp/application.html)
     2. Obtenha `client_id` e `client_secret`
     3. Inicie o fluxo OAuth2 ou gere um JWT
     4. Inclua o token nas requisições autenticadas
 
 servers:
-  - url: "https://sandbox.brise.agst.com.br:8433/api/v3"
+  - url: "https://sandbox.brise.agst.com.br:8443/api/v3"
     description: Servidor local de desenvolvimento
   - url: "https://api.brise.agst.com.br/api/v3"
     description: Servidor de Produção
@@ -71,13 +71,13 @@ tags:
       > - Após o cadastro, a aplicação fica com status `pending` até avaliação da equipe.  
       > - Após liberação, o sistema fornece `client_id` e `client_secret`.
 paths:
-  /users:
+  /users-private:
     post:
       tags:
         - Usuários
-      summary: Criar usuário
+      summary: Criar usuário (privado)
       description: |
-        Registra um novo usuário no sistema Brise Cloud.  
+        Registra um novo usuário no sistema Brise Cloud (usado pelo App).  
         Por padrão, a conta é criada com status `pending`.
 
         > ℹ️ **Observações:**  
@@ -148,6 +148,103 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
           description: Conflito. O e-mail já está em uso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: EMAIL_ALREADY_IN_USE
+
+  /users:
+    post:
+      tags:
+        - Usuários
+      summary: Criar usuário
+      description: |
+        Registra um novo usuário no sistema Brise Cloud.
+        Requer validação de **hCaptcha** para prevenir abuso automatizado (bots, scripts, etc.).
+
+        > ℹ️ **Fluxo:**  
+        >- Um token de ativação é enviado para o e-mail informado.  
+        >- A conta é criada com status `pending` até que o usuário clique no link de ativação.  
+
+        > 🛡️ **Segurança:**  
+        >- Este endpoint exige o parâmetro `h-captcha-response` (gerado pelo widget do hCaptcha).  
+        >- A verificação é feita server-side junto à API do hCaptcha (`https://api.hcaptcha.com/siteverify`).  
+
+        > 📌 **Integração frontend:**  
+        >- Inclua o script `<script src="https://js.hcaptcha.com/1/api.js" async defer></script>`  
+        >- Adicione `<div class="h-captcha" data-sitekey="SEU_SITEKEY"></div>` no formulário  
+        >- O token será enviado automaticamente como campo `h-captcha-response` no POST
+      operationId: createUserPublic
+      requestBody:
+        description: Dados do usuário e resposta do hCaptcha
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - full_name
+                - password
+                - h-captcha-response
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Endereço de e-mail do usuário
+                full_name:
+                  type: string
+                  description: Nome completo do usuário
+                password:
+                  type: string
+                  format: password
+                  description: Senha do usuário (mínimo 8 caracteres)
+                h-captcha-response:
+                  type: string
+                  description: Token retornado pelo widget do hCaptcha após resolução bem-sucedida
+                  example: "03AGdBq24PcL...[token truncado]"
+            examples:
+              createUserPublicRequest:
+                summary: Exemplo de requisição com hCaptcha
+                value:
+                  email: "ana.costa@exemplo.com"
+                  full_name: "Ana Costa"
+                  password: "MinhaSenha123!"
+                  h-captcha-response: "03AGdBq24PcLxyz..."
+      responses:
+        "201":
+          description: Usuário criado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    readOnly: true
+                    example: 105
+                  status:
+                    type: string
+                    enum: [pending, active, blocked]
+                    default: pending
+                    example: pending
+                  created_at:
+                    type: string
+                    format: date-time
+                    readOnly: true
+                    example: "2025-10-31T15:45:00Z"
+        "400":
+          description: Requisição inválida — dados ausentes, senha fraca ou hCaptcha inválido/expirado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflito — o e-mail já está em uso.
           content:
             application/json:
               schema:
@@ -434,6 +531,17 @@ paths:
                     type: string
                     example: INVALID_TOKEN
                     enum: [INVALID_TOKEN, EXPIRED_TOKEN, USER_NOT_FOUND]
+        "402":
+          description: |
+            Assinatura necessária para acessar este recurso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: SUBSCRIPTION_REQUIRED
 
   /corporations:
     post:
