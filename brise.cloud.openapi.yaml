@@ -169,27 +169,27 @@ paths:
         > ℹ️ **Fluxo:**  
         >- Um token de ativação é enviado para o e-mail informado.  
         >- A conta é criada com status `pending` até que o usuário clique no link de ativação.  
-
+        >
         > 🛡️ **Segurança [Proteção anti-bot]:**  
         >- Este endpoint exige o parâmetro `h-captcha-response` ou `cf-turnstile-response` (gerado pelo widget do dos serviços).  
         >- A verificação é feita server-side junto às APIs: 
-        >  - hCaptcha → `https://api.hcaptcha.com/siteverify`.  
-        >  - Cloudflare Turnstile → `https://challenges.cloudflare.com/turnstile/v0/siteverify`.  
-
+        >   - hCaptcha → `https://api.hcaptcha.com/siteverify`.  
+        >   - Cloudflare Turnstile → `https://challenges.cloudflare.com/turnstile/v0/siteverify`.  
+        >
         > 📌 **Integração frontend:**  
         > Inclua o script:
-
-        **hCaptcha**
-        ```html
-        <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
-        <div class="h-captcha" data-sitekey="SEU_SITEKEY_HCAPTCHA"></div>
-        ```
-
-        **Cloudflare Turnstile**
-        ```html
-        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-        <div class="cf-turnstile" data-sitekey="SEU_SITEKEY_TURNSTILE"></div>
-        ```
+        >
+        > **hCaptcha**
+        > ```html
+        > <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+        > <div class="h-captcha" data-sitekey="SEU_SITEKEY_HCAPTCHA"></div>
+        > ```
+        >
+        > **Cloudflare Turnstile**
+        > ```html
+        > <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+        > <div class="cf-turnstile" data-sitekey="SEU_SITEKEY_TURNSTILE"></div>
+        > ```
 
       operationId: createUserPublic
       requestBody:
