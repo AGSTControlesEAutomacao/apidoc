@@ -270,22 +270,15 @@ paths:
         Este endpoint é projetado para renovar a sessão de um usuário na plataforma web de forma transparente, utilizando um `refresh_token` válido.
 
         **Como funciona o fluxo:**
-        1. A aplicação React, ao detectar que o `access_token` expirou mas existe um `refresh_token` no `localStorage`, **redireciona** o navegador do usuário para este endpoint.
-        2. O `refresh_token` e um parâmetro `state` (para proteção CSRF) devem ser enviados como parâmetros de query na URL.
-        3. O backend valida o `refresh_token`.
-           - **Se válido:** Gera um novo `access_token` e um novo `refresh_token`, os injeta diretamente no `localStorage` do navegador e retorna o HTML da aplicação React, recarregando a página com a sessão renovada.
+        1. A aplicação, ao detectar que o `access_token` expirou mas existe um `refresh_token` no `localStorage`, **redireciona** o navegador do usuário para este endpoint.
+        2. O `refresh_token` devem ser enviado como parâmetro de query na URL.
+        3. A API valida o `refresh_token`.
+           - **Se válido:** Gera um novo `access_token` e um novo `refresh_token`, os injeta diretamente no `localStorage` do navegador e retorna o HTML da aplicação, recarregando a página com a sessão renovada.
            - **Se inválido:** Redireciona o usuário para a página de login para que ele se autentique novamente.
 
-        > 🚨 **Importante:** Este fluxo depende de um redirecionamento de página (requisição em primeiro plano), não devendo ser chamado via `fetch` ou `axios` (segundo plano), pois a injeção de tokens é feita pelo servidor ao carregar a página.
+        > 🚨 **Importante:** Este fluxo depende de um redirecionamento de página, pois a injeção de tokens é feita pelo servidor ao carregar a página.
       operationId: validateToken
       parameters:
-        - in: query
-          name: state
-          required: false
-          schema:
-            type: string
-          description: Valor opaco recomendado para proteção CSRF. Se enviado pelo cliente, deve ser retornado intacto no redirecionamento.
-          example: "xyz789state123"
         - in: query
           name: refresh_token
           required: true
@@ -295,24 +288,12 @@ paths:
             example: "dGhpc2lzc2Ftb3JlZnJlc2h0b2tlbg=="
       responses:
         "200":
-          description: Token válido.
+          description: Sessão renovada com sucesso. Os novos tokens serão recarregada no localStorage.
           content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  expires_at:
-                    type: integer
-                    format: int64
-                    description: "Tempo em segundos para expiração do token de acesso sendo o padrão (48 horas)"
-                    example: 172800
-        "302":
-          description: Redireciona para a aplicação com os novos tokens injetados (em caso de sucesso) ou para a página de login (em caso de falha).
-          headers:
-            Location:
-              description: URL de redirecionamento.
+            text/html:
               schema:
                 type: string
+                format: html
 
   /oauth/token-validation:
     get:
