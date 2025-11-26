@@ -48,9 +48,38 @@ tags:
       # 🚀 Primeiros Passos
       1. Registre seu aplicativo no [Portal de Desenvolvedores](https://brise.agst.com.br:8443/api/v3/sp/application.html) e [Portal de Desenvolvedores Sandbox](https://sandbox.brise.agst.com.br:8443/api/v3/sp/application.html)
       2. Obtenha `client_id` e `client_secret`
-      3. Inicie o fluxo OAuth2 ou gere um JWT
-      4. Inclua o token nas requisições autenticadas
+      3. Inicie o fluxo OAuth2 (veja as etapas nos endpoints `/oauth/authorize` e `/oauth/token`).
+      4. Inclua o token nas requisições autenticadas.
 
+      # 💡 Guia Implementação Plataforma Web (React)
+
+      Esta seção descreve as responsabilidades da plataforma Web ao implementar o fluxo de autenticação.
+
+      > 🚨 **Nota Importante:**  
+      > Esta sessão deve ser removida da documentação, pois é de uso esclusivo do serviço da plataforma web e não deverá ser divulgada.
+
+      ### Fluxo de Autenticação
+
+      1.  **Carregamento da Aplicação**: Ao iniciar, a aplicação deve verificar os tokens (`access_token`, `refresh_token`) no `localStorage`.
+          *   **Se `access_token` for válido**: A aplicação pode prosseguir para o estado autenticado.
+          *   **Se `access_token` estiver expirado, mas existir um `refresh_token` válido**: A plataforma Web deve fazer uma requisição em primeiro plano para o endpoint `GET /oauth/token` usando o 'refresh_token'`.
+              *   **Como fazer**: A aplicação React deve executar um **redirecionamento** do navegador para o endpoint `GET /oauth/token`, passando o `refresh_token` e um parâmetro `state` (valor aleatório para proteção CSRF) na URL. Ex: `window.location.href = '.../oauth/token?refresh_token=SEU_TOKEN&state=VALOR_ALEATORIO'`.
+              *   **Sucesso**: O backend irá processar o `refresh_token`, gerar novos tokens (`access_token` e `refresh_token`), injetá-los no `localStorage` e recarregar a aplicação.
+              *   **Falha**: Se o `refresh_token` for inválido ou expirado, o backend redirecionará para a página de login. A aplicação deve limpar os tokens antigos do `localStorage`.
+          *   **Se não existirem tokens ou o `refresh_token` for inválido**: A aplicação deve redirecionar o usuário para iniciar o fluxo de login OAuth2 (endpoint `/oauth/authorize`).
+
+      2.  **Finalização do Fluxo OAuth2**: Após o usuário autorizar a aplicação e a API concluir a troca do `code` pelo `access_token`, a API fará o seguinte:
+          *   **Injetará os tokens `access_token` e `refresh_token` diretamente no `localStorage`** do navegador.
+          *   Retornará o HTML da aplicação React, que será recarregada, agora com uma sessão válida.
+
+      ### Armazenamento e Uso dos Tokens
+
+      *   **Armazenamento**: É **obrigatório** o uso de `localStorage` para armazenar os tokens, pois a API foi projetado para injetar `access_token` e `refresh_token` nesse local.
+
+      *   **Uso**: A plataforma Web é responsável apenas por ler o `access_token` do `localStorage` e enviá-lo em todas as chamadas para endpoints protegidos, utilizando o cabeçalho `Authorization`:
+          ```
+          Authorization: Bearer ${access_token}
+          ```
   - name: Usuários
     description: |
       Esta categoria abrange o gerenciamento de contas no sistema Brise Cloud. Ela permite criar novos usuários, enviar tokens de ativação, ativar contas pendentes e solicitar o reenvio de um novo token caso o anterior tenha expirado ou seja perdido. O objetivo é fornecer um processo seguro e consistente para que os usuários completem sua ativação e possam acessar os recursos do sistema.
@@ -236,13 +265,66 @@ paths:
     get:
       tags:
         - Autenticação
+      summary: Renovar Sessão
+      description: |
+        Este endpoint é projetado para renovar a sessão de um usuário na plataforma web de forma transparente, utilizando um `refresh_token` válido.
+
+        **Como funciona o fluxo:**
+        1. A aplicação React, ao detectar que o `access_token` expirou mas existe um `refresh_token` no `localStorage`, **redireciona** o navegador do usuário para este endpoint.
+        2. O `refresh_token` e um parâmetro `state` (para proteção CSRF) devem ser enviados como parâmetros de query na URL.
+        3. O backend valida o `refresh_token`.
+           - **Se válido:** Gera um novo `access_token` e um novo `refresh_token`, os injeta diretamente no `localStorage` do navegador e retorna o HTML da aplicação React, recarregando a página com a sessão renovada.
+           - **Se inválido:** Redireciona o usuário para a página de login para que ele se autentique novamente.
+
+        > 🚨 **Importante:** Este fluxo depende de um redirecionamento de página (requisição em primeiro plano), não devendo ser chamado via `fetch` ou `axios` (segundo plano), pois a injeção de tokens é feita pelo servidor ao carregar a página.
+      operationId: validateToken
+      parameters:
+        - in: query
+          name: state
+          required: false
+          schema:
+            type: string
+          description: Valor opaco recomendado para proteção CSRF. Se enviado pelo cliente, deve ser retornado intacto no redirecionamento.
+          example: "xyz789state123"
+        - in: query
+          name: refresh_token
+          required: true
+          description: O `refresh_token` obtido anteriormente e armazenado no `localStorage`.
+          schema:
+            type: string
+            example: "dGhpc2lzc2Ftb3JlZnJlc2h0b2tlbg=="
+      responses:
+        "200":
+          description: Token válido.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  expires_at:
+                    type: integer
+                    format: int64
+                    description: "Tempo em segundos para expiração do token de acesso sendo o padrão (48 horas)"
+                    example: 172800
+        "302":
+          description: Redireciona para a aplicação com os novos tokens injetados (em caso de sucesso) ou para a página de login (em caso de falha).
+          headers:
+            Location:
+              description: URL de redirecionamento.
+              schema:
+                type: string
+
+  /oauth/token-validation:
+    get:
+      tags:
+        - Autenticação
       summary: Validar token
       description: |
         Verifica se o token de autenticação fornecido é válido, ainda não expirou ou se foi revogado. 
         Este endpoint pode ser usado por aplicativos ou plataformas para confirmar a validade do token armazenado, evitando a necessidade de login completo.  
 
         É especialmente útil em cenários de **“lembrar login”**, permitindo que o sistema valide um token salvo localmente antes de solicitar novamente as credenciais do usuário, proporcionando uma experiência mais fluida e segura.
-      operationId: validateToken
+      operationId: tokenValidation
       security:
         - bearerAuth: []
       parameters:
