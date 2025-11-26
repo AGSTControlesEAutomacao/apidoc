@@ -77,11 +77,16 @@ paths:
         - Autenticação
       summary: Fluxo OAuth2
       description: |
-        Página/endpoint de autorização do usuário (Authorization Server).
-        Redireciona o usuário para a tela de login/consentimento do Brise Cloud.
-        Após o usuário aprovar, redireciona de volta para o `redirect_uri` do cliente com o parâmetro `code`.
+        Este é o primeiro passo do fluxo de autorização OAuth2. O objetivo é obter o consentimento do usuário para que sua aplicação possa acessar os dados dele no Brise Cloud.
 
-        **Fluxo recomendado:** Authorization Code com PKCE (mais seguro para SPAs e apps móveis).
+        **Como funciona:**
+        1. Sua aplicação redireciona o usuário para esta página.
+        2. O usuário faz o login no Brise Cloud (se ainda não estiver logado) e vê uma tela de consentimento, informando quais permissões sua aplicação está solicitando.
+        3. Se o usuário aprovar, ele será redirecionado de volta para a `redirect_uri` que você especificou, recebendo um **código de autorização** temporário (`code`) como parâmetro na URL.
+
+        Este `code` é a prova de que o usuário autorizou sua aplicação. O próximo passo é trocá-lo por um `access_token` no endpoint `/oauth/token`.
+
+        > **Segurança:** Para aplicações web (SPAs) e mobile, é altamente recomendado o uso do fluxo **Authorization Code com PKCE**, que adiciona uma camada extra de segurança.
 
       operationId: oauthAuthorize
       parameters:
@@ -156,11 +161,15 @@ paths:
         - Autenticação
       summary: Trocar code por tokens
       description: |
-        Endpoint responsável por emitir o **access_token**, **refresh_token** e demais informações após o usuário ter autorizado a aplicação.
+        Este é o segundo e último passo do fluxo de autorização. Sua aplicação utiliza este endpoint para trocar o `code` (código de autorização temporário) obtido na etapa anterior por um **access_token**.
 
-        Suporta os grants:
-        - `authorization_code` (com ou sem PKCE)
-        - `refresh_token`
+        É com o `access_token` que sua aplicação poderá fazer chamadas autenticadas à API Brise Cloud em nome do usuário.
+
+        Este endpoint também é utilizado para renovar um `access_token` expirado, usando o `refresh_token`.
+
+        **Tipos de requisição (grant_type):**
+        - `authorization_code`: Use esta opção para a troca inicial do `code` por um `access_token`.
+        - `refresh_token`: Use esta opção para obter um novo `access_token` quando o atual expirar, sem que o usuário precise autorizar novamente.
 
       operationId: oauthToken
       security:
@@ -225,7 +234,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
-          description: Credenciais do cliente inválidas ou code_verifier incorreto
+          description: |
+            Credenciais inválidas ou usuário não ativo.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: INVALID_CREDENTIALS
+                    enum: [INVALID_CREDENTIALS, USER_BLOCKED, USER_PENDING]
 
   /users-private:
     post:
