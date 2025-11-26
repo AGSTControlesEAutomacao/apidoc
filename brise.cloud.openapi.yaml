@@ -234,6 +234,64 @@ paths:
                     value:
                       error: invalid_client
 
+  /oauth/validate-token:
+    get:
+      tags:
+        - Autenticação
+      summary: Validar token
+      description: |
+        Verifica se o token de autenticação fornecido é válido, ainda não expirou ou se foi revogado. 
+        Este endpoint pode ser usado por aplicativos ou plataformas para confirmar a validade do token armazenado, evitando a necessidade de login completo.  
+
+        É especialmente útil em cenários de **“lembrar login”**, permitindo que o sistema valide um token salvo localmente antes de solicitar novamente as credenciais do usuário, proporcionando uma experiência mais fluida e segura.
+      operationId: validateToken
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          description: Token de autenticação no formato `Bearer <access_token>`
+          schema:
+            type: string
+            example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      responses:
+        "200":
+          description: Token válido.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  expires_at:
+                    type: integer
+                    format: int64
+                    description: "Tempo em segundos para expiração do token de acesso sendo o padrão (48 horas)"
+                    example: 172800
+        "401":
+          description: |
+            Token inválido ou expirado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: INVALID_TOKEN
+                    enum: [INVALID_TOKEN, EXPIRED_TOKEN, USER_NOT_FOUND]
+        "402":
+          description: |
+            Assinatura necessária para acessar este recurso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: SUBSCRIPTION_REQUIRED
+
   /users-private:
     post:
       tags:
@@ -667,64 +725,6 @@ paths:
                     type: string
                     example: INVALID_CREDENTIALS
                     enum: [INVALID_CREDENTIALS, USER_BLOCKED, USER_PENDING]
-
-  /users/validate-token:
-    get:
-      tags:
-        - Usuários
-      summary: Validar token
-      description: |
-        Verifica se o token de autenticação fornecido é válido, ainda não expirou ou se foi revogado. 
-        Este endpoint pode ser usado por aplicativos ou plataformas para confirmar a validade do token armazenado, evitando a necessidade de login completo.  
-
-        É especialmente útil em cenários de **“lembrar login”**, permitindo que o sistema valide um token salvo localmente antes de solicitar novamente as credenciais do usuário, proporcionando uma experiência mais fluida e segura.
-      operationId: validateToken
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: header
-          name: Authorization
-          required: true
-          description: Token de autenticação no formato `Bearer <access_token>`
-          schema:
-            type: string
-            example: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-      responses:
-        "200":
-          description: Token válido.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  expires_at:
-                    type: integer
-                    format: int64
-                    description: "Tempo em segundos para expiração do token de acesso sendo o padrão (48 horas)"
-                    example: 172800
-        "401":
-          description: |
-            Token inválido ou expirado.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: INVALID_TOKEN
-                    enum: [INVALID_TOKEN, EXPIRED_TOKEN, USER_NOT_FOUND]
-        "402":
-          description: |
-            Assinatura necessária para acessar este recurso.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: SUBSCRIPTION_REQUIRED
 
   /corporations:
     post:
