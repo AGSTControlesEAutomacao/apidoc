@@ -28,21 +28,7 @@ info:
     - **Monitorar status em tempo real** e métricas operacionais  
     - **Integrar de forma unificada** com sistemas de terceiros via RESTful  
 
-    As chamadas são baseadas em métodos **RESTful**, seguindo boas práticas de design de APIs, com autenticação segura e respostas padronizadas para facilitar o desenvolvimento e a manutenção.  
-
-    # 🔐 Autenticação
-
-    Este tópico descreve os métodos de autenticação disponíveis e como utilizá-los.  
-
-    > ⚠️ **Recomendação**: Utilize OAuth 2.0 com fluxo `authorizationCode` para integrações seguras.
-
-    <!-- ReDoc-Inject: <security-definitions> -->
-
-    ## 🚀 Primeiros Passos
-    1. Registre seu aplicativo no [Portal de Desenvolvedores](https://brise.agst.com.br:8443/api/v3/sp/application.html) e [Portal de Desenvolvedores Sandbox](https://sandbox.brise.agst.com.br:8443/api/v3/sp/application.html)
-    2. Obtenha `client_id` e `client_secret`
-    3. Inicie o fluxo OAuth2 ou gere um JWT
-    4. Inclua o token nas requisições autenticadas
+    As chamadas são baseadas em métodos **RESTful**, seguindo boas práticas de design de APIs, com autenticação segura e respostas padronizadas para facilitar o desenvolvimento e a manutenção.
 
 servers:
   - url: "https://sandbox.brise.agst.com.br:8443/api/v3"
@@ -51,6 +37,20 @@ servers:
     description: Servidor de Produção
 
 tags:
+  - name: Autenticação
+    description: |
+      Este tópico descreve os métodos de autenticação disponíveis e como utilizá-los.  
+
+      > ⚠️ **Recomendação**: Utilize OAuth 2.0 com fluxo `authorizationCode` para integrações seguras.
+
+      <!-- ReDoc-Inject: <security-definitions> -->
+
+      # 🚀 Primeiros Passos
+      1. Registre seu aplicativo no [Portal de Desenvolvedores](https://brise.agst.com.br:8443/api/v3/sp/application.html) e [Portal de Desenvolvedores Sandbox](https://sandbox.brise.agst.com.br:8443/api/v3/sp/application.html)
+      2. Obtenha `client_id` e `client_secret`
+      3. Inicie o fluxo OAuth2 ou gere um JWT
+      4. Inclua o token nas requisições autenticadas
+
   - name: Usuários
     description: |
       Esta categoria abrange o gerenciamento de contas no sistema Brise Cloud. Ela permite criar novos usuários, enviar tokens de ativação, ativar contas pendentes e solicitar o reenvio de um novo token caso o anterior tenha expirado ou seja perdido. O objetivo é fornecer um processo seguro e consistente para que os usuários completem sua ativação e possam acessar os recursos do sistema.
@@ -71,6 +71,162 @@ tags:
       > - Após o cadastro, a aplicação fica com status `pending` até avaliação da equipe.  
       > - Após liberação, o sistema fornece `client_id` e `client_secret`.
 paths:
+  /oauth/authorize:
+    get:
+      tags:
+        - Autenticação
+      summary: Fluxo OAuth2
+      description: |
+        Página/endpoint de autorização do usuário (Authorization Server).
+        Redireciona o usuário para a tela de login/consentimento do Brise Cloud.
+        Após o usuário aprovar, redireciona de volta para o `redirect_uri` do cliente com o parâmetro `code`.
+
+        **Fluxo recomendado:** Authorization Code com PKCE (mais seguro para SPAs e apps móveis).
+
+      operationId: oauthAuthorize
+      parameters:
+        - name: response_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [code]
+          description: Deve ser `code` para o Authorization Code Flow
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Client ID da aplicação registrada
+          example: "app_1234567890abcdef"
+        - name: redirect_uri
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+          description: |
+            URI de redirecionamento. Obrigatória quando o cliente não possui um `redirect_uri`
+            pré-registrado ou quando o cliente deseja sobrescrever o `redirect_uri` pré-registrado.
+            Caso o cliente tenha um `redirect_uri` pré-registrado, este parâmetro pode ser omitido.
+          example: "https://meuapp.com/oauth/callback"
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Valor opaco recomendado para proteção CSRF. Se enviado pelo cliente, deve ser retornado intacto no redirecionamento.
+          example: "xyz789state123"
+        - name: code_challenge
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Obrigatório quando usar PKCE. Gerado a partir do code_verifier (S256 recomendado)
+          example: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+      responses:
+        "302":
+          description: Redireciona para a tela de login/consentimento ou diretamente para o redirect_uri com o `code`
+          headers:
+            Location:
+              description: URL de redirecionamento contendo `code` e `state` (ou página de erro)
+              schema:
+                type: string
+                example: "https://meuapp.com/oauth/callback?code=SplxlOBeZQQYbYS6WxSbIA&state=xyz789state123"
+        "400":
+          description: Parâmetros inválidos ou ausentes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Cliente não autorizado ou redirect_uri inválido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: ACCESS_DENIED
+
+  /oauth/token:
+    post:
+      tags:
+        - Autenticação
+      summary: Trocar code por tokens
+      description: |
+        Endpoint responsável por emitir o **access_token**, **refresh_token** e demais informações após o usuário ter autorizado a aplicação.
+
+        Suporta os grants:
+        - `authorization_code` (com ou sem PKCE)
+        - `refresh_token`
+
+      operationId: oauthToken
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/TokenRequestAuthorizationCode"
+                - $ref: "#/components/schemas/TokenRequestRefreshToken"
+              discriminator:
+                propertyName: grant_type
+                mapping:
+                  authorization_code: "#/components/schemas/TokenRequestAuthorizationCode"
+                  refresh_token: "#/components/schemas/TokenRequestRefreshToken"
+            examples:
+              authorization_code:
+                summary: Troca de code (com PKCE)
+                value:
+                  grant_type: authorization_code
+                  code: SplxlOBeZQQYbYS6WxSbIA
+                  redirect_uri: https://meuapp.com/oauth/callback
+                  code_verifier: dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+              refresh_token:
+                summary: Renovação via refresh token
+                value:
+                  grant_type: refresh_token
+                  refresh_token: dGhpc2lzc2Ftb3JlZnJlc2h0b2tlbg==
+      responses:
+        "200":
+          description: Tokens emitidos com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    description: Token JWT de acesso
+                    example: "eyJhbGciOiJSUzI1NiIsInR5cCI..."
+                  token_type:
+                    type: string
+                    example: bearer
+                  expires_in:
+                    type: integer
+                    description: "Tempo de vida em segundos (ex: 3600 = 1h)"
+                    example: 3600
+                  refresh_token:
+                    type: string
+                    description: Token para renovação (emitido apenas no primeiro authorization_code ou quando offline_access estiver no scope)
+                    example: "dGhpc2lzc2Ftb3JlZnJlc2h0b2tlbg=="
+                  scope:
+                    type: string
+                    description: Escopos concedidos
+                    example: "devices:read devices:write offline_access"
+        "400":
+          description: Parâmetro inválido, grant_type desconhecido, code expirado, etc.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Credenciais do cliente inválidas ou code_verifier incorreto
+
   /users-private:
     post:
       tags:
@@ -1137,3 +1293,36 @@ components:
         error:
           type: string
           example: INVALID_REQUEST
+    TokenRequestAuthorizationCode:
+      type: object
+      properties:
+        grant_type:
+          type: string
+          enum: [authorization_code]
+          description: Tipo de grant sendo utilizado
+        code:
+          type: string
+          description: Código de autorização recebido no /oauth/authorize
+        redirect_uri:
+          type: string
+          format: uri
+          description: Deve ser exatamente igual ao enviado no /oauth/authorize quando usado (ou omitido se o cliente tem redirect pré-registrado)
+        code_verifier:
+          type: string
+          description: Verifier usado no PKCE (obrigatório se code_challenge foi enviado na /authorize)
+      required:
+        - grant_type
+        - code
+    TokenRequestRefreshToken:
+      type: object
+      properties:
+        grant_type:
+          type: string
+          enum: [refresh_token]
+          description: Tipo de grant sendo utilizado
+        refresh_token:
+          type: string
+          description: Refresh token recebido anteriormente
+      required:
+        - grant_type
+        - refresh_token
