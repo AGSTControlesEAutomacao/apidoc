@@ -233,8 +233,6 @@ paths:
                     summary: Credenciais do cliente inválidas
                     value:
                       error: invalid_client
-
-  /oauth/validate-token:
     get:
       tags:
         - Autenticação
@@ -1310,10 +1308,6 @@ components:
         code:
           type: string
           description: Código de autorização recebido no /oauth/authorize
-        redirect_uri:
-          type: string
-          format: uri
-          description: Deve ser exatamente igual ao enviado no /oauth/authorize quando usado (ou omitido se o cliente tem redirect pré-registrado)
         client_id:
           type: string
           description: Client ID da aplicação registrada
