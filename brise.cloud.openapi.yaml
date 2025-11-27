@@ -684,11 +684,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: INVALID_REQUEST
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Usuário não encontrado ou já ativo.
           content:
@@ -699,6 +695,235 @@ paths:
                   error:
                     type: string
                     example: USER_NOT_FOUND
+
+  /users/forgot-password:
+    post:
+      tags:
+        - Usuários
+      summary: Solicitar redefinição de senha
+      description: |
+        Inicia o fluxo de redefinição de senha para um usuário.
+
+        O usuário informa seu e-mail e, se a conta existir e estiver ativa, a API gera um token de uso único e o envia para o endereço de e-mail cadastrado.
+
+        > ℹ️ **Observações:**
+        > - O token enviado por e-mail tem um tempo de expiração curto (ex: 1 hora).
+        > - Para evitar que o endpoint seja usado para verificar a existência de e-mails no sistema, ele deve sempre retornar uma resposta de sucesso genérica.
+
+        > 🛡️ **Segurança:**
+        > Recomenda-se aplicar **rate limiting** neste endpoint para prevenir abuso (envio massivo de e-mails).
+      operationId: forgotPassword
+      requestBody:
+        description: E-mail do usuário que esqueceu a senha.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Endereço de e-mail da conta para a qual a redefinição de senha será solicitada.
+            examples:
+              forgotPasswordRequest:
+                summary: Exemplo de requisição para redefinir senha
+                value:
+                  email: "joao.silva@exemplo.com"
+      responses:
+        "200":
+          description: Solicitação recebida. Se o e-mail existir, um link de redefinição será enviado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "REQUEST_RECEIVED"
+
+  /users/reset-password:
+    post:
+      tags:
+        - Usuários
+      summary: Redefinir a senha
+      description: |
+        Conclui o fluxo de redefinição de senha.
+
+        O usuário submete o token recebido por e-mail junto com sua nova senha. A API valida o token e, se for válido, atualiza a senha do usuário.
+
+        > ℹ️ **Observações:**
+        > - O token só pode ser usado uma vez e expira após um curto período.
+      operationId: resetPassword
+      requestBody:
+        description: Token de redefinição e a nova senha.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - token
+                - new_password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: O e-mail do usuário, para verificação cruzada.
+                token:
+                  type: string
+                  description: O token de redefinição recebido por e-mail.
+                new_password:
+                  type: string
+                  format: password
+                  description: A nova senha para a conta (mínimo 8 caracteres).
+            examples:
+              resetPasswordRequest:
+                summary: Exemplo de requisição para efetivar a redefinição
+                value:
+                  email: "joao.silva@exemplo.com"
+                  token: "a1b2c3d4e5f6a1b2c3d4e5f6"
+                  new_password: "NovaSenhaSuperForte123"
+      responses:
+        "200":
+          description: Senha redefinida com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "RESET_SUCCESS"
+        "400":
+          description: Requisição inválida. O token é inválido, expirou ou os dados fornecidos não correspondem.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/me/change-password:
+    post:
+      tags:
+        - Usuários
+      summary: Alterar a senha
+      description: |
+        Permite que um usuário autenticado altere sua própria senha.
+
+        O usuário deve fornecer sua senha atual para verificação antes que a nova senha seja definida.
+
+        > 🛡️ **Segurança:** Esta operação deve ser realizada por um usuário logado e autenticado.
+      operationId: changeCurrentUserPassword
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Senha atual e a nova senha desejada.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - current_password
+                - new_password
+              properties:
+                current_password:
+                  type: string
+                  format: password
+                  description: A senha atual da conta para verificação.
+                new_password:
+                  type: string
+                  format: password
+                  description: A nova senha desejada (mínimo 8 caracteres).
+            examples:
+              changePasswordRequest:
+                summary: Exemplo de requisição para alterar senha
+                value:
+                  current_password: "SenhaAntiga123"
+                  new_password: "NovaSenhaSuperForte456"
+      responses:
+        "200":
+          description: Senha alterada com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: PASSWORD_CHANGED
+        "400":
+          description: Requisição inválida. A senha atual está incorreta ou a nova senha não atende aos requisitos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Não autorizado (token ausente ou inválido).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: INVALID_CREDENTIALS
+                    enum: [INVALID_CREDENTIALS, USER_BLOCKED, USER_PENDING]
+
+  /users/me:
+    patch:
+      tags:
+        - Usuários
+      summary: Atualizar dados
+      description: |
+        Permite que o usuário autenticado atualize suas próprias informações de perfil, como nome completo.
+
+        Este endpoint utiliza o método `PATCH`, o que significa que apenas os campos enviados na requisição serão atualizados. Campos omitidos permanecerão inalterados.
+      operationId: updateCurrentUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Campos do perfil do usuário a serem atualizados.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                full_name:
+                  type: string
+                  description: O novo nome completo do usuário.
+      responses:
+        "200":
+          description: Perfil do usuário atualizado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: PROFILE_UPDATED
+        "400":
+          description: Requisição inválida ou dados mal formatados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Não autorizado (token ausente ou inválido).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: INVALID_CREDENTIALS
+                    enum: [INVALID_CREDENTIALS, USER_BLOCKED, USER_PENDING]
 
   /users/login:
     post:
