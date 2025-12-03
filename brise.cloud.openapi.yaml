@@ -842,9 +842,7 @@ paths:
 
         Este endpoint é o destino do link enviado ao e-mail do usuário durante o fluxo de "esqueci minha senha".
 
-        A página contem um formulário com dois campos para a nova senha (para confirmação), que, antes de ser submetido confirmará a consistencia, e fará uma chamada `POST` para este mesmo endpoint para efetivar a alteração.
-
-        > 🛡️ **Segurança:** O servidor deve validar o token antes de exibir a página. Se o token for inválido ou expirado, deve-se retornar uma página de erro apropriada (ex: 400 ou 404).
+        A página contem um formulário com dois campos para a nova senha (para confirmação), que, antes de ser submetido confirmará a consistência, e fará uma chamada `POST` para este mesmo endpoint para efetivar a alteração.
       operationId: getResetPasswordPage
       parameters:
         - in: query
