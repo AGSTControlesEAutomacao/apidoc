@@ -210,17 +210,29 @@ paths:
                   refresh_token: "#/components/schemas/TokenRequestRefreshToken"
             examples:
               authorization_code:
+                summary: Troca de code
+                value:
+                  grant_type: authorization_code
+                  client_id: "app_1234567890abcdef"
+                  client_secret: "secret_0987654321fedcba"
+                  code: "SplxlOBeZQQYbYS6WxSbIA"
+                  redirect_uri: "https://brise.agst.com.br"
+              authorization_pkce_code:
                 summary: Troca de code (com PKCE)
                 value:
                   grant_type: authorization_code
-                  code: SplxlOBeZQQYbYS6WxSbIA
-                  redirect_uri: https://meuapp.com/oauth/callback
-                  code_verifier: dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+                  client_id: "app_1234567890abcdef"
+                  client_secret: "secret_0987654321fedcba"
+                  code: "SplxlOBeZQQYbYS6WxSbIA"
+                  redirect_uri: "https://brise.agst.com.br"
+                  code_verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
               refresh_token:
-                summary: Renovação via refresh token
+                summary: Renovação via refresh_token
                 value:
                   grant_type: refresh_token
-                  refresh_token: dGhpc2lzc2Ftb3JlZnJlc2h0b2tlbg==
+                  client_id: "app_1234567890abcdef"
+                  client_secret: "secret_0987654321fedcba"
+                  refresh_token: "dGhpc2lzc2Ftb3JlZnJlc2h0b2tlbg=="
       responses:
         "200":
           description: Tokens emitidos com sucesso
