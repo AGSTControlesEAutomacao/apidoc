@@ -1,7 +1,7 @@
 openapi: 3.0.4
 info:
   title: Brise Cloud API
-  version: 3.0.2
+  version: 3.0.3
   contact:
     name: AGST
     email: ped@agst.com.br
@@ -158,6 +158,14 @@ paths:
             type: string
           description: Obrigatório quando usar PKCE. Gerado a partir do code_verifier
           example: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+        - name: code_challenge_method
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [S256]
+          description: Método usado para gerar o code_challenge. Use `S256` para PKCE.
+          example: "S256"
       responses:
         "302":
           description: Redireciona para a tela de login/consentimento ou diretamente para o redirect_uri com o `code`
@@ -202,17 +210,29 @@ paths:
                   refresh_token: "#/components/schemas/TokenRequestRefreshToken"
             examples:
               authorization_code:
+                summary: Troca de code
+                value:
+                  grant_type: authorization_code
+                  client_id: "app_1234567890abcdef"
+                  client_secret: "secret_0987654321fedcba"
+                  code: "SplxlOBeZQQYbYS6WxSbIA"
+                  redirect_uri: "https://brise.agst.com.br"
+              authorization_pkce_code:
                 summary: Troca de code (com PKCE)
                 value:
                   grant_type: authorization_code
-                  code: SplxlOBeZQQYbYS6WxSbIA
-                  redirect_uri: https://meuapp.com/oauth/callback
-                  code_verifier: dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+                  client_id: "app_1234567890abcdef"
+                  client_secret: "secret_0987654321fedcba"
+                  code: "SplxlOBeZQQYbYS6WxSbIA"
+                  redirect_uri: "https://brise.agst.com.br"
+                  code_verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
               refresh_token:
-                summary: Renovação via refresh token
+                summary: Renovação via refresh_token
                 value:
                   grant_type: refresh_token
-                  refresh_token: dGhpc2lzc2Ftb3JlZnJlc2h0b2tlbg==
+                  client_id: "app_1234567890abcdef"
+                  client_secret: "secret_0987654321fedcba"
+                  refresh_token: "dGhpc2lzc2Ftb3JlZnJlc2h0b2tlbg=="
       responses:
         "200":
           description: Tokens emitidos com sucesso
@@ -234,12 +254,8 @@ paths:
                     example: 172800
                   refresh_token:
                     type: string
-                    description: Token para renovação (emitido apenas no primeiro authorization_code ou quando offline_access estiver no scope)
+                    description: Token para renovação
                     example: "dGhpc2lzc2Ftb3JlZnJlc2h0b2tlbg=="
-                  scope:
-                    type: string
-                    description: Escopos concedidos
-                    example: "devices:read devices:write offline_access"
         "400":
           description: code expirado, grant inválido ou credenciais do cliente inválidas.
           content:
@@ -366,7 +382,6 @@ paths:
         >- Um token de ativação é enviado para o e-mail informado no cadastro.  
         >- O token deve ser utilizado em outro endpoint para ativar a conta.  
         >- Contas corporativas devem ser criadas por administradores de organizações.
-
         > 🚨 **Nota Importante:**  
         > O path deste deve ser alterado para algo menos óbvio quando for para produção, para evitar spam e ataques de força bruta uma vez que não requer autenticação.
       operationId: createUser
@@ -392,7 +407,14 @@ paths:
                 password:
                   type: string
                   format: password
-                  description: Senha do usuário (mínimo 8 caracteres)
+                  description: |
+                    A nova senha para a conta.
+                    Deve conter no mínimo 8 caracteres, incluindo:
+                    - Pelo menos uma letra maiúscula
+                    - Pelo menos uma letra minúscula
+                    - Pelo menos um número
+                    - Pelo menos um caractere especial
+                  pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
             examples:
               createUserRequest:
                 summary: Exemplo de requisição para criação de usuário
@@ -496,7 +518,14 @@ paths:
                 password:
                   type: string
                   format: password
-                  description: Senha do usuário (mínimo 8 caracteres)
+                  description: |
+                    A nova senha para a conta.
+                    Deve conter no mínimo 8 caracteres, incluindo:
+                    - Pelo menos uma letra maiúscula
+                    - Pelo menos uma letra minúscula
+                    - Pelo menos um número
+                    - Pelo menos um caractere especial
+                  pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
                 h-captcha-response:
                   type: string
                   description: Token retornado pelo widget do hCaptcha após resolução bem-sucedida
@@ -568,7 +597,6 @@ paths:
         > - O token de ativação expira após 7 dias.  
         > - A qualquer momento, antes ou depois de expirar, pode ser solicitado o reenvio do token através de outro endpoint.  
         > - Após a ativação, o status do usuário passa de `pending` para `active`.
-
         > 🚨 **Nota Importante:**  
         > O path deste deve ser alterado para algo menos óbvio quando for para produção, para evitar spam e ataques de força bruta uma vez que não requer autenticação.
       operationId: activateUser
@@ -645,7 +673,8 @@ paths:
         > - O token antigo é invalidado assim que o novo é gerado.  
         > - Pode ser solicitado a qualquer momento, mesmo que o token anterior tenha expirado.  
         > - Após receber o novo token, o usuário deve utilizá-lo para ativar sua conta através do endpoint `/users/activate`.
-
+        > 🛡️ **Segurança:**  
+        > Aplicar **rate limiting** neste endpoint para prevenir abuso (envio massivo de e-mails).
         > 🚨 **Nota Importante:**  
         > O path deste deve ser alterado para algo menos óbvio quando for para produção, para evitar spam e ataques de força bruta uma vez que não requer autenticação.
       operationId: resendActivationToken
@@ -684,11 +713,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: INVALID_REQUEST
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: Usuário não encontrado ou já ativo.
           content:
@@ -699,6 +724,287 @@ paths:
                   error:
                     type: string
                     example: USER_NOT_FOUND
+
+  /users/forgot-password:
+    post:
+      tags:
+        - Usuários
+      summary: Solicitar redefinição de senha
+      description: |
+        Inicia o fluxo de redefinição de senha para um usuário.
+
+        O usuário informa seu e-mail e, se a conta existir e estiver ativa, a API gera um token de uso único e o envia para o endereço de e-mail cadastrado.
+
+        > ℹ️ **Observações:**
+        > - O token enviado por e-mail tem um tempo de expiração curto (ex: 1 hora).
+        > - Para evitar que o endpoint seja usado para verificar a existência de e-mails no sistema, retornar uma resposta de sucesso genérica.
+        > 🛡️ **Segurança:**  
+        > Aplicar **rate limiting** neste endpoint para prevenir abuso (envio massivo de e-mails).
+        > 🚨 **Nota Importante:**  
+        > O path deste deve ser alterado para algo menos óbvio quando for para produção, para evitar spam e ataques de força bruta uma vez que não requer autenticação.
+
+      operationId: forgotPassword
+      requestBody:
+        description: E-mail do usuário que esqueceu a senha.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Endereço de e-mail da conta para a qual a redefinição de senha será solicitada.
+            examples:
+              forgotPasswordRequest:
+                summary: Exemplo de requisição para redefinir senha
+                value:
+                  email: "joao.silva@exemplo.com"
+      responses:
+        "200":
+          description: Solicitação recebida. Se o e-mail existir, um link de redefinição será enviado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "REQUEST_RECEIVED"
+
+  /users/reset-password:
+    post:
+      tags:
+        - Usuários
+      summary: Redefinir senha
+      description: |
+        Conclui o fluxo de redefinição de senha.
+
+        O usuário submete o token recebido por e-mail junto com sua nova senha. A API valida o token e, se for válido, atualiza a senha do usuário.
+
+        > ℹ️ **Observações:**
+        > - O token só pode ser usado uma vez e expira após um curto período.
+      operationId: resetPassword
+      parameters:
+        - in: query
+          name: email
+          required: true
+          description: O e-mail do usuário, para verificação cruzada.
+          schema:
+            type: string
+            format: email
+        - in: query
+          name: recoveryToken
+          required: true
+          description: O token de redefinição recebido por e-mail.
+          schema:
+            type: string
+      requestBody:
+        description: A nova senha para a conta.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              properties:
+                password:
+                  type: string
+                  format: password
+                  description: |
+                    A nova senha para a conta.
+                    Deve conter no mínimo 8 caracteres, incluindo:
+                    - Pelo menos uma letra maiúscula
+                    - Pelo menos uma letra minúscula
+                    - Pelo menos um número
+                    - Pelo menos um caractere especial
+                  pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
+            examples:
+              resetPasswordRequest:
+                summary: Exemplo de requisição para efetivar a redefinição
+                value:
+                  password: "NovaSenhaSuperForte123"
+      responses:
+        "200":
+          description: Senha redefinida com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "RESET_SUCCESS"
+        "400":
+          description: Requisição inválida. O token é inválido, expirou ou os dados fornecidos não correspondem.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags:
+        - Usuários
+      summary: Redefinir senha
+      description: |
+        Exibe uma página HTML que permite ao usuário definir uma nova senha.
+
+        Este endpoint é o destino do link enviado ao e-mail do usuário durante o fluxo de "esqueci minha senha".
+
+        A página contem um formulário com dois campos para a nova senha (para confirmação), que, antes de ser submetido confirmará a consistência, e fará uma chamada `POST` para este mesmo endpoint para efetivar a alteração.
+      operationId: getResetPasswordPage
+      parameters:
+        - in: query
+          name: email
+          required: true
+          description: O e-mail do usuário, recebido no link de redefinição.
+          schema:
+            type: string
+            format: email
+        - in: query
+          name: recoveryToken
+          required: true
+          description: O token de redefinição recebido por e-mail.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Página de redefinição de senha exibida com sucesso.
+          content:
+            text/html:
+              schema:
+                type: string
+                format: html
+
+  /users/me/change-password:
+    post:
+      tags:
+        - Usuários
+      summary: Alterar a senha
+      description: |
+        Permite que um usuário autenticado altere sua própria senha.
+
+        O usuário deve fornecer sua senha atual para verificação antes que a nova senha seja definida.
+
+        > 🛡️ **Segurança:** Esta operação deve ser realizada por um usuário logado e autenticado. E é indicado que se aplique as melhores praticas, onde se solicite duas vezes o preenchimento da senha e se valide-as antes de encaminhar.
+      operationId: changeCurrentUserPassword
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Senha atual e a nova senha desejada.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+                - new_password
+              properties:
+                password:
+                  type: string
+                  format: password
+                  description: A senha atual da conta para verificação.
+                new_password:
+                  type: string
+                  format: password
+                  description: |
+                    A nova senha para a conta.
+                    Deve conter no mínimo 8 caracteres, incluindo:
+                    - Pelo menos uma letra maiúscula
+                    - Pelo menos uma letra minúscula
+                    - Pelo menos um número
+                    - Pelo menos um caractere especial
+                  pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
+            examples:
+              changePasswordRequest:
+                summary: Exemplo de requisição para alterar senha
+                value:
+                  password: "SenhaAntiga123"
+                  new_password: "NovaSenhaSuperForte123"
+      responses:
+        "200":
+          description: Senha alterada com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: PASSWORD_CHANGED
+        "400":
+          description: Requisição inválida. A senha atual está incorreta ou a nova senha não atende aos requisitos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Não autorizado (token ausente ou inválido).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: INVALID_CREDENTIALS
+                    enum: [INVALID_CREDENTIALS, USER_BLOCKED, USER_PENDING]
+
+  /users/me:
+    patch:
+      tags:
+        - Usuários
+      summary: Atualizar dados
+      description: |
+        Permite que o usuário autenticado atualize suas próprias informações de perfil, como nome completo.
+
+        Este endpoint utiliza o método `PATCH`, o que significa que apenas os campos enviados na requisição serão atualizados. Campos omitidos permanecerão inalterados.
+      operationId: updateCurrentUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Campos do perfil do usuário a serem atualizados.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                full_name:
+                  type: string
+                  description: O novo nome completo do usuário.
+      responses:
+        "200":
+          description: Perfil do usuário atualizado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: PROFILE_UPDATED
+        "400":
+          description: Requisição inválida ou dados mal formatados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Não autorizado (token ausente ou inválido).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: INVALID_CREDENTIALS
+                    enum: [INVALID_CREDENTIALS, USER_BLOCKED, USER_PENDING]
 
   /users/login:
     post:
@@ -713,7 +1019,6 @@ paths:
         > - Apenas usuários com status `active` podem se autenticar.  
         > - Usuários com status `pending` iniciaram automaticamente o processo de ativação, e um código de ativação é enviado para o e-mail cadastrado.  
         > - Usuários com status `blocked` não podem realizar login e receberão uma mensagem de erro apropriada.
-
         > 🚨 **Nota Importante:**  
         > O path deste deve ser alterado para algo menos óbvio quando for para produção, para evitar spam e ataques de força bruta uma vez que não requer autenticação.
       operationId: loginUser
@@ -1241,7 +1546,6 @@ paths:
         > - O usuário deve existir no Brise Cloud.
         > - A solicitação será criada com status `pending` até ser avaliada.
         > - Campos obrigatórios: `name`, `email`, `contact_name`, `contact_phone`.
-
         > 🚨 **Nota Importante:**  
         > Quando houver a plataforma implementada as solicitações deverão ser atraves dela e por tanto respeitando as regras de segurança, deixando de ser um endpoint publico.
       operationId: createApplication
