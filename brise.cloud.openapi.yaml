@@ -102,12 +102,19 @@ tags:
   - name: Sistema
     description: |
       Operações de manutenção e controle do dispositivo Brise.
+  - name: Acesso
+    description: |
+      Operações relacionadas ao controle de acesso e compartilhamento de dispositivos Brise via nuvem.
+      Permite gerar convites (vouchers) para conceder acesso a outros usuários e gerenciar aprovações.
   - name: Rotinas
     description: |
       Gerenciamento de rotinas de automação executadas localmente pelo dispositivo.
   - name: Logs
     description: |
       Histórico de eventos e ações executadas pelo ou através do dispositivo.
+  - name: Dispositivo
+    description: |
+      Monitoramento e controle direto do Ar Condicionado via dispositivo, além de configuração de funções especiais, roteado via Cloud.
 paths:
   /oauth/authorize:
     get:
@@ -2370,6 +2377,504 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /control/{device}:
+    get:
+      tags:
+        - Dispositivo
+      summary: Estado AC e Sensores 🚩Adicionado
+      description: Retorna o estado atual configurado do Ar Condicionado e os valores aferidos pelos sensores do ambiente no dispositivo `{device}`.
+      operationId: getACControl
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: device
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Número de série do dispositivo.
+          example: "200000"
+      responses:
+        "200":
+          description: Estado do AC e leitura dos sensores.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ACControlResponse"
+        "401":
+          description: Token de autenticação Cloud ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Usuário sem permissão para acessar o dispositivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Dispositivo não encontrado ou não cadastrado na conta.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: O dispositivo está offline ou indisponível.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags:
+        - Dispositivo
+      summary: Alterar AC 🚩Adicionado
+      description: |
+        Altera as configurações do ar condicionado no dispositivo `{device}`.  
+        O envio de cada chave é opcional. Se a chave não for enviada, o estado correspondente não será alterado.
+      operationId: updateACControl
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: device
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Número de série do dispositivo.
+          example: "200000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ACControl"
+            examples:
+              ligar_modo_cool:
+                summary: Ligar no modo Frio, ventilação máxima, 20°C
+                value:
+                  power: 1
+                  setpoint: 20
+                  fan: 3
+                  mode: 1
+              apenas_desligar:
+                summary: Desligar o ar condicionado
+                value:
+                  power: 0
+      responses:
+        "200":
+          description: Comando recebido e processado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: Requisição inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token de autenticação Cloud ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Acesso negado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Dispositivo não encontrado ou não cadastrado na conta.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: O dispositivo está offline ou processando outra operação.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /access/vouchers/{device}:
+    post:
+      tags:
+        - Acesso
+      summary: Compartilha Dispositivo 🚩Adicionado
+      description: |
+        Inicia o fluxo de compartilhamento do dispositivo `{device}` para outro usuário.
+        O serviço criará o convite pendente e notificará o destinatário via e-mail.
+        Não é gerado um código de voucher para compartilhamento manual via link.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: device
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Número de série do dispositivo a ser compartilhado.
+          example: "200000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role
+                - grantee_email
+              properties:
+                role:
+                  $ref: "#/components/schemas/AccessRole"
+                grantee_email:
+                  type: string
+                  format: email
+                  description: |
+                    E-mail do usuário que receberá o convite para acesso ao dispositivo.
+                    O usuário precisará aceitar o compartilhamento no App.
+                  example: "maria@brise.com.br"
+                path:
+                  type: string
+                  maxLength: 255
+                  description: |
+                    Sugestão do proprietário de onde o equipamento deve ser posicionado na árvore de grupos do destinatário (ex.: `Matriz/Piso 2/Sala de Reuniões`).
+                  example: "Matriz/Piso 2/Sala de Reuniões"
+      responses:
+        "201":
+          description: Compartilhamento iniciado e notificação enviada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  voucher_id:
+                    type: string
+                    format: uuid
+                    description: Identificador do convite gerado.
+                    example: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
+        "400":
+          description: Parâmetros inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token de acesso ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: O usuário não possui privilégio para compartilhar o dispositivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Dispositivo não encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    get:
+      tags:
+        - Acesso
+      summary: Lista Convites 🚩Adicionado
+      description: |
+        Retorna os convites pendentes de acesso que foram emitidos para o dispositivo `{device}` e que ainda não foram aceitos nem revogados.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: device
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Número de série do dispositivo.
+          example: "200000"
+      responses:
+        "200":
+          description: Lista de convites pendentes (vouchers).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vouchers:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CloudVoucher"
+        "401":
+          description: Token de acesso ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: O usuário não possui permissão para listar convites.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Dispositivo não encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      tags:
+        - Acesso
+      summary: Cancela Convite 🚩Adicionado
+      description: |
+        Revoga um convite pendente que foi emitido para o dispositivo, cancelando o compartilhamento antes que o destinatário aceite.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: device
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Número de série do dispositivo.
+          example: "200000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - voucher_id
+              properties:
+                voucher_id:
+                  type: string
+                  format: uuid
+                  description: Identificador do convite a ser cancelado.
+                  example: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
+      responses:
+        "200":
+          description: Convite revogado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: Requisição inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: O usuário não tem permissão para cancelar o convite.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Dispositivo ou convite não encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /access/pending:
+    get:
+      tags:
+        - Acesso
+      summary: Lista Compartilhamentos 🚩Adicionado
+      description: |
+        Retorna a lista de dispositivos compartilhados com o usuário autenticado que estão aguardando sua aprovação (convites pendentes de aceite).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista de convites pendentes de aceite para a conta do usuário.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pending_shares:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PendingShare"
+        "401":
+          description: Token de acesso ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /access/redeem:
+    post:
+      tags:
+        - Acesso
+      summary: Aceita Compartilhamento 🚩Adicionado
+      description: |
+        Aprova o recebimento de um dispositivo compartilhado (resgata o voucher).
+        O usuário vincula o dispositivo à sua conta e consolida a permissão recebida.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - voucher_id
+                - subject_id
+              properties:
+                voucher_id:
+                  type: string
+                  format: uuid
+                  description: Identificador do convite (voucher) pendente.
+                  example: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
+                subject_id:
+                  type: integer
+                  format: int64
+                  description: |
+                    Identificador numérico do usuário que está resgatando, gerado automaticamente pelo serviço Cloud. Deve coincidir com o ID do usuário autenticado.
+                  example: 101
+      responses:
+        "200":
+          description: |
+            Convite aceito com sucesso. O dispositivo agora consta na lista do usuário e o token de acesso no dispositivo físico será devidamente configurado pelo serviço.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  device_id:
+                    type: integer
+                    format: int64
+                    description: Número de série do dispositivo que foi compartilhado.
+                    example: 200000
+                  role:
+                    $ref: "#/components/schemas/AccessRole"
+                  path:
+                    type: string
+                    nullable: true
+                    description: Caminho sugerido para posicionamento na árvore de grupos do usuário.
+                    example: "Matriz/Piso 2/Sala de Reuniões"
+        "400":
+          description: Requisição malformada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token de acesso ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "Tentativa de resgate não autorizada (ex: ID divergente)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Voucher desconhecido ou não direcionado a este usuário.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /access/token/{device}:
+    delete:
+      tags:
+        - Acesso
+      summary: Revoga Acesso 🚩Adicionado
+      description: |
+        Remove o acesso de um determinado usuário ao dispositivo especificado.
+        O serviço também comandará a revogação do token respectivo diretamente no dispositivo físico.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: device
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Número de série do dispositivo.
+          example: "200000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subject_id
+              properties:
+                subject_id:
+                  type: integer
+                  format: int64
+                  description: |
+                    Identificador numérico do usuário cujo acesso ao dispositivo será revogado, gerado automaticamente pelo serviço Cloud.
+                  example: 101
+      responses:
+        "200":
+          description: Acesso revogado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: Requisição inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token de autenticação ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: O usuário não possui permissão para revogar este acesso.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuário ou dispositivo não encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2452,6 +2957,87 @@ components:
         - refresh_token
         - client_id
         - client_secret
+    ACControl:
+      type: object
+      description: Representa o estado configurado do Ar Condicionado. Todas as chaves são opcionais na requisição de alteração (POST).
+      properties:
+        power:
+          type: integer
+          description: "0: Desligar, 1: Ligar (Se ausente no POST, mantém o estado atual)"
+          enum: [0, 1]
+          example: 1
+        setpoint:
+          type: integer
+          description: "Temperatura desejada (°C)"
+          example: 22
+        fan:
+          type: integer
+          description: "Velocidade do ventilador (0: auto, 1: low, 2: med, 3: high)"
+          enum: [0, 1, 2, 3]
+          example: 0
+        mode:
+          type: integer
+          description: "Modo de operação (0: auto, 1: cool, 2: dry, 3: fan, 4: heat)"
+          enum: [0, 1, 2, 3, 4]
+          example: 1
+        sw_v:
+          type: boolean
+          description: "Estado do defletor vertical"
+          example: false
+        sw:
+          type: boolean
+          description: "Estado do defletor horizontal"
+          example: false
+        fast:
+          type: boolean
+          description: "Modo de resfriamento/aquecimento rápido (turbo)"
+          example: false
+        sleep:
+          type: boolean
+          description: "Modo noturno (sleep)"
+          example: false
+
+    ACSensors:
+      type: object
+      description: Leitura dos sensores do ambiente.
+      properties:
+        room_temp:
+          type: number
+          description: "Temperatura ambiente atual aferida (°C)"
+          example: 24.5
+        temp_max:
+          type: number
+          description: "Temperatura máxima do dia (°C)"
+          example: 29.0
+        temp_min:
+          type: number
+          description: "Temperatura mínima do dia (°C)"
+          example: 18.5
+        temp_avg:
+          type: number
+          description: "Temperatura média do dia (°C)"
+          example: 23.2
+        presence:
+          type: boolean
+          description: "Indica se há detecção de pessoas no ambiente"
+          example: true
+        presence_duration:
+          type: integer
+          description: "Tempo em segundos no estado atual de presença (com ou sem pessoas)"
+          example: 1800
+        machine_state:
+          type: boolean
+          description: "Confirmação por sensor de que a máquina realmente encontra-se ligada (true) ou desligada (false)"
+          example: true
+
+    ACControlResponse:
+      type: object
+      description: Resposta consolidada com o estado configurado e as leituras de ambiente.
+      properties:
+        ac:
+          $ref: "#/components/schemas/ACControl"
+        sensors:
+          $ref: "#/components/schemas/ACSensors"
 
     EventLog:
       type: object
@@ -2627,3 +3213,74 @@ components:
             Índice de destino (0-based) para onde a rotina deve ser movida na lista.  
             Por exemplo, `idx: 0` move a rotina para o início da lista.
           example: 0
+
+    AccessRole:
+      type: string
+      enum:
+        - viewer
+        - operator
+        - manager
+      description: |
+        Papel associado a um acesso ao dispositivo, em ordem crescente de privilégio:
+        - `viewer`: leitura de estado e telemetria.
+        - `operator`: `viewer` + envio de comandos de controle.
+        - `manager`: `operator` + rotinas, configuração e geração de convites.
+
+        O papel `owner`, obtido no provisionamento, acumula todos os privilégios de `manager` mais a gestão de acessos; não pode ser concedido por convite.
+      example: operator
+
+    CloudVoucher:
+      type: object
+      description: |
+        Representa um convite pendente para compartilhamento de acesso, que foi enviado mas ainda não foi aceito ou revogado.
+      properties:
+        voucher_id:
+          type: string
+          format: uuid
+          description: Identificador do convite, usado para listagem e revogação.
+          example: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
+        device_id:
+          type: integer
+          format: int64
+          description: Número de série do dispositivo que gerou o convite.
+          example: 200000
+        role:
+          $ref: "#/components/schemas/AccessRole"
+        grantee_email:
+          type: string
+          format: email
+          description: E-mail do usuário destinatário que recebeu o convite.
+          example: "maria@brise.com.br"
+        created_at:
+          type: string
+          format: date-time
+          description: Instante de emissão do convite (UTC).
+          example: "2026-08-28T12:00:00Z"
+
+    PendingShare:
+      type: object
+      description: |
+        Informação de um dispositivo compartilhado com o usuário que ainda aguarda aceitação (resgate).
+      properties:
+        voucher_id:
+          type: string
+          format: uuid
+          description: Identificador do convite pendente.
+          example: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
+        device_id:
+          type: integer
+          format: int64
+          description: Número de série do dispositivo oferecido no compartilhamento.
+          example: 200000
+        inviter_email:
+          type: string
+          format: email
+          description: E-mail de quem enviou o convite.
+          example: "joao@brise.com.br"
+        role:
+          $ref: "#/components/schemas/AccessRole"
+        created_at:
+          type: string
+          format: date-time
+          description: Instante em que o convite foi feito.
+          example: "2026-08-28T12:00:00Z"

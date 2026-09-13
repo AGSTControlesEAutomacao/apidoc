@@ -59,6 +59,8 @@ tags:
     description: Gerenciamento de rotinas de automação executadas localmente pelo dispositivo.
   - name: Logs
     description: Consulta aos históricos de eventos, dados de utilização e registros de temperatura do dispositivo para fins de auditoria e rastreabilidade.
+  - name: Dispositivo
+    description: Monitoramento e controle direto do Ar Condicionado via dispositivo, além de configuração de funções especiais.
 
 paths:
   /network/status:
@@ -724,7 +726,7 @@ paths:
     post:
       tags:
         - Acesso
-      summary: Gera Voucher 🚩Adicionado
+      summary: Compartilha Dispositivo 🚩Adicionado
       description: |
         Gera um voucher que pode ser utilizado por outro usuário para obter acesso ao dispositivo.
 
@@ -824,7 +826,7 @@ paths:
     get:
       tags:
         - Acesso
-      summary: Lista Vouchers 🚩Adicionado
+      summary: Lista Convites 🚩Adicionado
       description: |
         Retorna os vouchers de acesso emitidos para o dispositivo que ainda estão disponíveis para resgate.
       security:
@@ -868,7 +870,7 @@ paths:
     delete:
       tags:
         - Acesso
-      summary: Revoga Voucher 🚩Adicionado
+      summary: Cancela Convite 🚩Adicionado
       description: |
         Revoga (cancela) um voucher pendente emitido para o dispositivo, tornando-o inválido para qualquer resgate futuro.
 
@@ -938,7 +940,7 @@ paths:
     post:
       tags:
         - Acesso
-      summary: Resgata Voucher 🚩Adicionado
+      summary: Aceita Compartilhamento 🚩Adicionado
       description: |
         Resgata um voucher válido e obtém um Access Token para acesso ao dispositivo.
 
@@ -1195,6 +1197,80 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /control:
+    get:
+      tags:
+        - Dispositivo
+      summary: Estado AC e Sensores 🚩Adicionado
+      description: Retorna o estado atual configurado do Ar Condicionado e os valores aferidos pelos sensores do ambiente.
+      operationId: getACControl
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Estado do AC e leitura dos sensores.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ACControlResponse"
+        "401":
+          description: Token ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags:
+        - Dispositivo
+      summary: Alterar AC 🚩Adicionado
+      description: |
+        Altera as configurações do ar condicionado.  
+        O envio de cada chave é opcional. Se a chave não for enviada, o estado correspondente não será alterado.
+      operationId: updateACControl
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ACControl"
+            examples:
+              ligar_modo_cool:
+                summary: Ligar no modo Frio, ventilação máxima, 20°C
+                value:
+                  power: 1
+                  setpoint: 20
+                  fan: 3
+                  mode: 1
+              apenas_desligar:
+                summary: Desligar o ar condicionado
+                value:
+                  power: 0
+      responses:
+        "200":
+          description: Comando recebido e processado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: Requisição inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Acesso negado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1214,6 +1290,88 @@ components:
           type: string
           description: Código de erro representando o tipo de falha da requisição.
           example: INVALID_REQUEST
+
+    ACControl:
+      type: object
+      description: Representa o estado configurado do Ar Condicionado.
+      properties:
+        power:
+          type: integer
+          description: "0: Desligar, 1: Ligar (Se ausente, mantém o estado atual)"
+          enum: [0, 1]
+          example: 1
+        setpoint:
+          type: integer
+          description: "Temperatura desejada (°C)"
+          example: 22
+        fan:
+          type: integer
+          description: "Velocidade do ventilador (0: auto, 1: low, 2: med, 3: high)"
+          enum: [0, 1, 2, 3]
+          example: 0
+        mode:
+          type: integer
+          description: "Modo de operação (0: auto, 1: cool, 2: dry, 3: fan, 4: heat)"
+          enum: [0, 1, 2, 3, 4]
+          example: 1
+        sw_v:
+          type: boolean
+          description: "Estado do defletor vertical"
+          example: false
+        sw:
+          type: boolean
+          description: "Estado do defletor horizontal"
+          example: false
+        fast:
+          type: boolean
+          description: "Modo de resfriamento/aquecimento rápido (turbo)"
+          example: false
+        sleep:
+          type: boolean
+          description: "Modo noturno (sleep)"
+          example: false
+
+    ACSensors:
+      type: object
+      description: Leitura dos sensores do ambiente.
+      properties:
+        temp:
+          type: number
+          description: "Temperatura ambiente atual aferida (°C)"
+          example: 24.5
+        temp_max:
+          type: number
+          description: "Temperatura máxima do dia (°C)"
+          example: 29.0
+        temp_min:
+          type: number
+          description: "Temperatura mínima do dia (°C)"
+          example: 18.5
+        temp_avg:
+          type: number
+          description: "Temperatura média do dia (°C)"
+          example: 23.2
+        presence:
+          type: boolean
+          description: "Indica se há detecção de pessoas no ambiente"
+          example: true
+        presence_duration:
+          type: integer
+          description: "Tempo em segundos no estado atual de presença (com ou sem pessoas)"
+          example: 1800
+        machine_state:
+          type: boolean
+          description: "Confirmação por sensor de que a máquina realmente encontra-se ligada (true) ou desligada (false)"
+          example: true
+
+    ACControlResponse:
+      type: object
+      description: Resposta consolidada com o estado configurado e as leituras de ambiente.
+      properties:
+        ac:
+          $ref: "#/components/schemas/ACControl"
+        sensors:
+          $ref: "#/components/schemas/ACSensors"
 
     EventLog:
       type: object
