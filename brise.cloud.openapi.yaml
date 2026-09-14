@@ -111,10 +111,11 @@ tags:
       Gerenciamento de rotinas de automação executadas localmente pelo dispositivo.
   - name: Logs
     description: |
-      Histórico de eventos e ações executadas pelo ou através do dispositivo.
+      description: Consulta aos históricos de eventos, dados de utilização e registros de temperatura do dispositivo.
   - name: Dispositivo
     description: |
       Monitoramento e controle direto do Ar Condicionado via dispositivo, além de configuração de funções especiais, roteado via Cloud.
+
 paths:
   /oauth/authorize:
     get:
@@ -2382,7 +2383,7 @@ paths:
       tags:
         - Dispositivo
       summary: Estado AC e Sensores 🚩Adicionado
-      description: Retorna o estado atual configurado do Ar Condicionado e os valores aferidos pelos sensores do ambiente no dispositivo `{device}`.
+      description: Retorna o estado atual configurado do Ar Condicionado e os valores aferidos pelos sensores do ambiente.
       operationId: getACControl
       security:
         - bearerAuth: []
@@ -2430,7 +2431,7 @@ paths:
         - Dispositivo
       summary: Alterar AC 🚩Adicionado
       description: |
-        Altera as configurações do ar condicionado no dispositivo `{device}`.  
+        Altera as configurações do ar condicionado.  
         O envio de cada chave é opcional. Se a chave não for enviada, o estado correspondente não será alterado.
       operationId: updateACControl
       security:
@@ -2715,7 +2716,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  pending_shares:
+                  shares:
                     type: array
                     items:
                       $ref: "#/components/schemas/PendingShare"
@@ -2959,11 +2960,11 @@ components:
         - client_secret
     ACControl:
       type: object
-      description: Representa o estado configurado do Ar Condicionado. Todas as chaves são opcionais na requisição de alteração (POST).
+      description: Representa o estado configurado do Ar Condicionado.
       properties:
         power:
           type: integer
-          description: "0: Desligar, 1: Ligar (Se ausente no POST, mantém o estado atual)"
+          description: "0: Desligar, 1: Ligar (Se ausente, mantém o estado atual)"
           enum: [0, 1]
           example: 1
         setpoint:
@@ -2972,30 +2973,34 @@ components:
           example: 22
         fan:
           type: integer
-          description: "Velocidade do ventilador (0: auto, 1: low, 2: med, 3: high)"
-          enum: [0, 1, 2, 3]
+          description: "Velocidade do ventilador (0: auto, 1: low, 2: med, 3: high, 4: max)"
+          enum: [0, 1, 2, 3, 4]
           example: 0
         mode:
           type: integer
-          description: "Modo de operação (0: auto, 1: cool, 2: dry, 3: fan, 4: heat)"
+          description: "Modo de operação (0: auto, 1: cool, 2: dry, 3: heat, 4: fan)"
           enum: [0, 1, 2, 3, 4]
           example: 1
         sw_v:
-          type: boolean
+          type: integer
           description: "Estado do defletor vertical"
-          example: false
+          enum: [0, 1]
+          example: 1
         sw:
-          type: boolean
+          type: integer
           description: "Estado do defletor horizontal"
-          example: false
+          enum: [0, 1]
+          example: 1
         fast:
-          type: boolean
-          description: "Modo de resfriamento/aquecimento rápido (turbo)"
-          example: false
+          type: integer
+          description: "Modo de resfriamento/aquecimento rápido (fast)"
+          enum: [0, 1]
+          example: 1
         sleep:
-          type: boolean
+          type: integer
           description: "Modo noturno (sleep)"
-          example: false
+          enum: [0, 1]
+          example: 1
 
     ACSensors:
       type: object
@@ -3018,17 +3023,19 @@ components:
           description: "Temperatura média do dia (°C)"
           example: 23.2
         presence:
-          type: boolean
-          description: "Indica se há detecção de pessoas no ambiente"
-          example: true
-        presence_duration:
+          type: integer
+          description: "Indica se há detecção de pessoas no ambiente (1) ou se não há (0)"
+          enum: [0, 1]
+          example: 1
+        presence_du:
           type: integer
           description: "Tempo em segundos no estado atual de presença (com ou sem pessoas)"
           example: 1800
-        machine_state:
-          type: boolean
-          description: "Confirmação por sensor de que a máquina realmente encontra-se ligada (true) ou desligada (false)"
-          example: true
+        machine_st:
+          type: integer
+          description: "Confirmação por sensor de que a máquina realmente encontra-se ligada (1) ou desligada (0)"
+          enum: [0, 1]
+          example: 1
 
     ACControlResponse:
       type: object
