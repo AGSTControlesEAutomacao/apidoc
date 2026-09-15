@@ -2876,6 +2876,85 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+
+  /config/{device}:
+    get:
+      tags:
+        - Dispositivo
+      summary: Obter Configurações 🚩Adicionado
+      description: Retorna as configurações atuais do dispositivo em relação as funções extras.
+      operationId: getDeviceConfig
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: device
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Número de série do dispositivo.
+          example: "200000"
+      responses:
+        "200":
+          description: Configurações atuais.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceConfig"
+        "401":
+          description: Token ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags:
+        - Dispositivo
+      summary: Alterar Configurações 🚩Adicionado
+      description: |
+        Altera as configurações do dispositivo.
+        O envio de cada chave é opcional. Se a chave não for enviada, o valor correspondente não será alterado.
+      operationId: updateDeviceConfig
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: device
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Número de série do dispositivo.
+          example: "200000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceConfig"
+      responses:
+        "200":
+          description: Comando recebido e processado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: Requisição inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Acesso negado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2958,6 +3037,90 @@ components:
         - refresh_token
         - client_id
         - client_secret
+
+    DeviceConfig:
+      type: object
+      description: |
+        Configurações do dispositivo.
+        Estas configurações dizem respeito a funções extras do dispositivo que persistem na memória (não são perdidas ao reiniciar o dispositivo), diferentemente das configurações de controle do Ar Condicionado.
+      properties:
+        absence_shutdown:
+          type: integer
+          description: "Habilita ou desabilita o desligamento automático por ausência (0: desabilitado, 1: habilitado)"
+          enum: [0, 1]
+          example: 0
+        absence_timeout:
+          type: integer
+          description: "Tempo em segundos que o ambiente deve permanecer vazio antes do desligamento automático"
+          example: 1800
+        anonymous_control:
+          type: integer
+          description: "Habilita a possibilidade de controlar o AC sem autenticação (0: desabilitado, 1: habilitado)"
+          enum: [0, 1]
+          example: 0
+        auto_clean:
+          type: integer
+          description: "Habilita ou desabilita a funcionalidade de limpeza automática (0: desabilitado, 1: habilitado)"
+          enum: [0, 1]
+          example: 0
+        ir_jammer:
+          type: integer
+          description: "Emite um sinal de interferência quando detecta um comando de infravermelho (0: desabilitado, 1: habilitado)"
+          enum: [0, 1]
+          example: 0
+        light_comfort:
+          type: integer
+          description: "Desliga o LED de estado para não incomodar em ambientes escuros (0: desabilitado, 1: habilitado)"
+          enum: [0, 1]
+          example: 0
+        max_temp_limit_value:
+          type: integer
+          description: "Estabelece um limite máximo para o setpoint (°C)"
+          example: 26
+        temp_limit:
+          type: integer
+          description: "Habilita o limite para o setpoint ser configurado (0: desabilitado, 1: habilitado)"
+          enum: [0, 1]
+          example: 0
+        min_temp_limit_value:
+          type: integer
+          description: "Estabelece o limite mínimo para o setpoint (°C)"
+          example: 20
+        presence_resume:
+          type: integer
+          description: "Habilita ou desabilita o religamento automático por presença (0: desabilitado, 1: habilitado)"
+          enum: [0, 1]
+          example: 0
+        presence_timeout:
+          type: integer
+          description: "Tempo em segundos que a presença deve permanecer contínua antes do religamento automático"
+          example: 600
+        receiver:
+          type: integer
+          description: "Sensor de receptor e emissor infravermelho (0: interno, 1: externo)"
+          enum: [0, 1]
+          example: 0
+        resilient_mode:
+          type: integer
+          description: "Mantém o equipamento sincronizado com o estado definido pelo sistema de automação (0: desabilitado, 1: habilitado)"
+          enum: [0, 1]
+          example: 0
+        autoCleanTimer:
+          type: integer
+          description: "Indica se um ciclo de Limpeza Automática está em execução."
+          readOnly: true
+          example: 1212
+        autoCleanTotalTime:
+          type: integer
+          description: "Tempo decorrido do ciclo de limpeza, em segundos."
+          readOnly: true
+          example: 2323
+        autoCleanRunning:
+          type: integer
+          description: "Tempo total previsto para o ciclo de limpeza, em segundos."
+          readOnly: true
+          example: 23
+
     ACControl:
       type: object
       description: Representa o estado configurado do Ar Condicionado.
@@ -3000,6 +3163,12 @@ components:
           type: integer
           description: "Modo noturno (sleep)"
           enum: [0, 1]
+          example: 1
+        findme:
+          type: integer
+          description: "Sinal luminoso para identificar o dispositivo (1: reproduzir padrão luminoso)"
+          enum: [1]
+          writeOnly: true
           example: 1
 
     ACSensors:
