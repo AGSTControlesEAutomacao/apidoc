@@ -2554,13 +2554,14 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  voucher_id:
-                    type: string
-                    format: uuid
-                    description: Identificador do convite gerado.
-                    example: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
+                $ref: "#/components/schemas/VoucherCreated"
+              examples:
+                sucesso:
+                  summary: Voucher de uso único
+                  value:
+                    expires_at: "2026-09-16T19:54:16"
+                    voucher_code: "eyJlbWwiOiJ0aWFnby5kYXZpbGFAYWdzdC5jb20uYnIiLCJleHAiOjE3ODk1ODg0NTYsImp0aSI6ImNiOGZhNzgwLTUyOGMtNDAxMi04Y2U1LTEyMThhODBlMWFkNCIsInB0aCI6IkFHU1QiLCJyb2xlIjoib3BlcmF0b3IiLCJzcmwiOjIwMDAwMSwidXNlcyI6MX0=.0rWrte0VnCtW6URvF/7/ExM5e1AV5z7A2w+MBVZiX+A="
+                    voucher_id: "cb8fa780-528c-4012-8ce5-1218a80e1ad4"
         "400":
           description: Parâmetros inválidos.
           content:
@@ -2614,6 +2615,13 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/CloudVoucher"
+              examples:
+                exemplo:
+                  value:
+                    vouchers:
+                      - expires_at: "2026-09-16T19:27:51"
+                        uses_remaining: 1
+                        voucher_id: "ed65b236-0fda-4bf5-a1b4-1a19cff4d443"
         "401":
           description: Token de acesso ausente ou inválido.
           content:
@@ -2638,7 +2646,9 @@ paths:
         - Acesso
       summary: Cancela Convite 🚩Adicionado
       description: |
-        Revoga um convite pendente que foi emitido para o dispositivo, cancelando o compartilhamento antes que o destinatário aceite.
+        Revoga (cancela) um voucher pendente emitido para o dispositivo, tornando-o inválido para qualquer resgate futuro.
+
+        Somente usuários com papel `manager` ou `owner` podem revogar vouchers emitidos pelo dispositivo.
       security:
         - bearerAuth: []
       parameters:
@@ -2649,20 +2659,14 @@ paths:
             type: string
           description: Número de série do dispositivo.
           example: "200000"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - voucher_id
-              properties:
-                voucher_id:
-                  type: string
-                  format: uuid
-                  description: Identificador do convite a ser cancelado.
-                  example: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
+        - name: voucher_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Identificador do convite a ser cancelado.
+          example: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
       responses:
         "200":
           description: Convite revogado com sucesso.
@@ -2693,7 +2697,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: Dispositivo ou convite não encontrado.
+          description: Voucher não encontrado. Pode ter expirado, já sido revogado ou nunca ter sido emitido por este dispositivo.
           content:
             application/json:
               schema:
@@ -2744,46 +2748,41 @@ paths:
             schema:
               type: object
               required:
-                - voucher_id
+                - voucher_code
                 - subject_id
               properties:
-                voucher_id:
+                voucher_code:
                   type: string
-                  format: uuid
-                  description: Identificador do convite (voucher) pendente.
-                  example: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
+                  description: Valor recebido em `voucher_code` na emissão do voucher.
+                  example: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9..."
                 subject_id:
                   type: integer
                   format: int64
                   description: |
-                    Identificador numérico do usuário que está resgatando, gerado automaticamente pelo serviço Cloud. Deve coincidir com o ID do usuário autenticado.
+                    Identificador do usuário que está resgatando.
                   example: 101
       responses:
         "200":
           description: |
-            Convite aceito com sucesso. O dispositivo agora consta na lista do usuário e o token de acesso no dispositivo físico será devidamente configurado pelo serviço.
+            Convite aceito com sucesso. Retorna apenas o `access_token`.
           content:
             application/json:
               schema:
                 type: object
+                required:
+                  - access_token
                 properties:
-                  success:
-                    type: boolean
-                    example: true
-                  device_id:
-                    type: integer
-                    format: int64
-                    description: Número de série do dispositivo que foi compartilhado.
-                    example: 200000
-                  role:
-                    $ref: "#/components/schemas/AccessRole"
-                  path:
+                  access_token:
                     type: string
-                    nullable: true
-                    description: Caminho sugerido para posicionamento na árvore de grupos do usuário.
-                    example: "Matriz/Piso 2/Sala de Reuniões"
+                    description: Access Token de acesso ao dispositivo.
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              examples:
+                sucesso:
+                  summary: Exemplo de sucesso
+                  value:
+                    access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
         "400":
-          description: Requisição malformada.
+          description: Requisição malformada (campos obrigatórios ausentes).
           content:
             application/json:
               schema:
@@ -2795,13 +2794,47 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: "Tentativa de resgate não autorizada (ex: ID divergente)."
+          description: "Tentativa de resgate não autorizada (ex: ID divergente do usuário autenticado)."
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                negado:
+                  value:
+                    error: ACCESS_DENIED
         "404":
-          description: Voucher desconhecido ou não direcionado a este usuário.
+          description: Voucher não encontrado — removido pelo proprietário ou nunca emitido por este dispositivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                inexistente:
+                  value:
+                    error: VOUCHER_NOT_FOUND
+        "409":
+          description: Voucher já resgatado o número máximo de vezes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                consumido:
+                  value:
+                    error: VOUCHER_ALREADY_REDEEMED
+        "410":
+          description: Voucher expirado (o prazo em `expires_at` já passou).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                expirado:
+                  value:
+                    error: VOUCHER_EXPIRED
+        "429":
+          description: Tentativas de resgate em excesso. Aguarde antes de tentar novamente.
           content:
             application/json:
               schema:
@@ -2825,21 +2858,15 @@ paths:
             type: string
           description: Número de série do dispositivo.
           example: "200000"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - subject_id
-              properties:
-                subject_id:
-                  type: integer
-                  format: int64
-                  description: |
-                    Identificador numérico do usuário cujo acesso ao dispositivo será revogado, gerado automaticamente pelo serviço Cloud.
-                  example: 101
+        - name: subject_id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: |
+            Identificador numérico do usuário cujo acesso ao dispositivo será revogado, gerado automaticamente pelo serviço Cloud.
+          example: 101
       responses:
         "200":
           description: Acesso revogado com sucesso.
@@ -2852,7 +2879,7 @@ paths:
                     type: boolean
                     example: true
         "400":
-          description: Requisição inválida.
+          description: Requisição inválida. Verifique se o `subject_id` foi informado corretamente.
           content:
             application/json:
               schema:
@@ -2864,17 +2891,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: O usuário não possui permissão para revogar este acesso.
+          description: O usuário autenticado não possui permissão para revogar o acesso informado (`manager`/`owner` obrigatório).
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                negado:
+                  value:
+                    error: ACCESS_DENIED
         "404":
-          description: Usuário ou dispositivo não encontrado.
+          description: Usuário não encontrado — o `subject_id` informado não possui acesso ativo neste dispositivo.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                inexistente:
+                  value:
+                    error: USER_NOT_FOUND
 
 
   /config/{device}:
@@ -3408,30 +3443,47 @@ components:
     CloudVoucher:
       type: object
       description: |
-        Representa um convite pendente para compartilhamento de acesso, que foi enviado mas ainda não foi aceito ou revogado.
+        Representa um convite pendente para compartilhamento de acesso.
+      required:
+        - voucher_id
+        - uses_remaining
       properties:
+        expires_at:
+          type: string
+          description: Data/hora de expiração do convite (ISO 8601).
+          example: "2026-09-16T19:27:51"
+        uses_remaining:
+          type: integer
+          description: Resgates ainda disponíveis para este convite.
+          example: 1
         voucher_id:
           type: string
           format: uuid
-          description: Identificador do convite, usado para listagem e revogação.
-          example: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
-        device_id:
-          type: integer
-          format: int64
-          description: Número de série do dispositivo que gerou o convite.
-          example: 200000
-        role:
-          $ref: "#/components/schemas/AccessRole"
-        grantee_email:
+          description: Identificador do convite.
+          example: "ed65b236-0fda-4bf5-a1b4-1a19cff4d443"
+
+    VoucherCreated:
+      type: object
+      description: |
+        Convite/Voucher recém-criado.
+      required:
+        - expires_at
+        - voucher_code
+        - voucher_id
+      properties:
+        expires_at:
           type: string
-          format: email
-          description: E-mail do usuário destinatário que recebeu o convite.
-          example: "maria@brise.com.br"
-        created_at:
+          description: Data/hora de expiração do voucher (ISO 8601).
+          example: "2026-09-16T19:54:16"
+        voucher_code:
           type: string
-          format: date-time
-          description: Instante de emissão do convite (UTC).
-          example: "2026-08-28T12:00:00Z"
+          description: Artefato assinado transmitido ao destinatário e apresentado no resgate.
+          example: "eyJlbWwiOiJ0aWFnby5kYXZpbGFAYWdzdC5jb20uYnIiLCJleHAiOjE3ODk1ODg0NTYsImp0aSI6ImNiOGZhNzgwLTUyOGMtNDAxMi04Y2U1LTEyMThhODBlMWFkNCIsInB0aCI6IkFHU1QiLCJyb2xlIjoib3BlcmF0b3IiLCJzcmwiOjIwMDAwMSwidXNlcyI6MX0=.0rWrte0VnCtW6URvF/7/ExM5e1AV5z7A2w+MBVZiX+A="
+        voucher_id:
+          type: string
+          format: uuid
+          description: Identificador único do voucher gerado.
+          example: "cb8fa780-528c-4012-8ce5-1218a80e1ad4"
 
     PendingShare:
       type: object

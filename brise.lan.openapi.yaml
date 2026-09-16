@@ -788,15 +788,9 @@ paths:
                 sucesso:
                   summary: Voucher de uso único
                   value:
-                    voucher_id: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
-                    voucher_code: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9..."
-                    device_id: 1234567890
-                    role: operator
-                    grantee_email: "maria@brise.com.br"
-                    path: "Matriz/Piso 2/Sala de Reuniões"
-                    uses_remaining: 1
-                    created_at: "2026-08-29T12:00:00Z"
-                    expires_at: "2026-08-29T13:00:00Z"
+                    expires_at: "2026-09-16T19:54:16"
+                    voucher_code: "eyJlbWwiOiJ0aWFnby5kYXZpbGFAYWdzdC5jb20uYnIiLCJleHAiOjE3ODk1ODg0NTYsImp0aSI6ImNiOGZhNzgwLTUyOGMtNDAxMi04Y2U1LTEyMThhODBlMWFkNCIsInB0aCI6IkFHU1QiLCJyb2xlIjoib3BlcmF0b3IiLCJzcmwiOjIwMDAwMSwidXNlcyI6MX0=.0rWrte0VnCtW6URvF/7/ExM5e1AV5z7A2w+MBVZiX+A="
+                    voucher_id: "cb8fa780-528c-4012-8ce5-1218a80e1ad4"
         "400":
           description: Parâmetros inválidos (papel desconhecido ou valores fora do intervalo permitido).
           content:
@@ -850,14 +844,9 @@ paths:
                 exemplo:
                   value:
                     vouchers:
-                      - voucher_id: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
-                        device_id: 1234567890
-                        role: operator
-                        grantee_email: "maria@brise.com.br"
-                        path: null
+                      - expires_at: "2026-09-16T19:27:51"
                         uses_remaining: 1
-                        created_at: "2026-08-29T12:00:00Z"
-                        expires_at: null
+                        voucher_id: "ed65b236-0fda-4bf5-a1b4-1a19cff4d443"
         "401":
           description: Token de acesso ausente ou inválido.
           content:
@@ -865,7 +854,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: O token autenticado não tem privilégio para listar vouchers.
+          description: O usuário não possui permissão para listar convites.
           content:
             application/json:
               schema:
@@ -880,20 +869,15 @@ paths:
         Somente usuários com papel `manager` ou `owner` podem revogar vouchers emitidos pelo dispositivo.
       security:
         - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - voucher_id
-              properties:
-                voucher_id:
-                  type: string
-                  format: uuid
-                  description: Identificador único do voucher a ser revogado.
-                  example: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
+      parameters:
+        - name: voucher_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Identificador único do voucher a ser revogado.
+          example: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
       responses:
         "200":
           description: Voucher revogado com sucesso.
@@ -907,7 +891,7 @@ paths:
                     description: Indica se o voucher foi revogado com sucesso.
                     example: true
         "400":
-          description: Requisição inválida. Verifique se o `voucher_id` foi informado corretamente.
+          description: Requisição inválida.
           content:
             application/json:
               schema:
@@ -919,7 +903,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: O token autenticado não tem privilégio para revogar vouchers (`manager`/`owner` obrigatório).
+          description: O usuário não tem permissão para cancelar o convite.
           content:
             application/json:
               schema:
@@ -967,14 +951,10 @@ paths:
                   example: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9..."
                 subject_id:
                   type: string
+                  format: uuid
                   description: |
-                    Identificador estável de quem está resgatando, definido pelo cliente — o UUID gerado pelo app na primeira execução (Modo LAN) ou o `user_id` da Cloud. Vai no claim `sub` do Access Token; usado pela Cloud e pelo app para correlacionar o acesso ao usuário.
+                    Identificador UUID de quem está resgatando.
                   example: "550e8400-e29b-41d4-a716-446655440000"
-                grantee_email:
-                  type: string
-                  format: email
-                  description: E‑mail de quem está recebendo o acesso. Sobrescreve o `grantee_email` definido na emissão do voucher, quando enviado. Sem efeito de autorização.
-                  example: "maria@brise.com.br"
       responses:
         "200":
           description: |
@@ -983,43 +963,18 @@ paths:
             application/json:
               schema:
                 type: object
+                required:
+                  - access_token
                 properties:
-                  success:
-                    type: boolean
-                    example: true
                   access_token:
                     type: string
                     description: Access Token de acesso ao dispositivo.
                     example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  token_id:
-                    type: string
-                    format: uuid
-                    description: |
-                      Identificador único do Access Token (claim `jti`). É o valor a incluir na lista de revogação do dispositivo para invalidar este acesso.
-                    example: "9f8e7d6c-5b4a-3210-fedc-ba9876543210"
-                  device_id:
-                    type: integer
-                    format: int64
-                    description: Número de série do dispositivo.
-                    example: 1234567890
-                  role:
-                    $ref: "#/components/schemas/AccessRole"
-                  path:
-                    type: string
-                    nullable: true
-                    description: |
-                      Caminho de grupos sugerido por quem compartilhou, copiado do voucher. Informativo: o app do destinatário decide se cria os grupos e posiciona o equipamento nesse ponto da própria árvore.
-                    example: "Matriz/Piso 2/Sala de Reuniões"
               examples:
                 sucesso:
                   summary: Exemplo de sucesso
                   value:
-                    success: true
                     access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    token_id: "9f8e7d6c-5b4a-3210-fedc-ba9876543210"
-                    device_id: 1234567890
-                    role: operator
-                    path: "Matriz/Piso 2/Sala de Reuniões"
         "400":
           description: Requisição malformada (campos obrigatórios ausentes).
           content:
@@ -1087,21 +1042,16 @@ paths:
         Somente usuários com papel `manager` ou `owner` podem revogar o acesso de outros usuários.
       security:
         - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - subject_id
-              properties:
-                subject_id:
-                  type: string
-                  format: uuid
-                  description: |
-                    Identificador único do usuário cujo acesso ao dispositivo será revogado. Corresponde ao claim `sub` do Access Token registrado no resgate (`POST /access/redeem`).
-                  example: "550e8400-e29b-41d4-a716-446655440000"
+      parameters:
+        - name: subject_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: |
+            Identificador único do usuário cujo acesso ao dispositivo será revogado. Corresponde ao claim `sub` do Access Token registrado no resgate (`POST /access/redeem`).
+          example: "550e8400-e29b-41d4-a716-446655440000"
       responses:
         "200":
           description: Acesso revogado com sucesso.
@@ -1371,7 +1321,7 @@ components:
           example: 0
         absence_timeout:
           type: integer
-          description: "Tempo em segundos que o ambiente deve permanecer vazio antes do desligamento automático"
+          description: "Tempo em minutos que o ambiente deve permanecer vazio antes do desligamento automático"
           example: 1800
         anonymous_control:
           type: integer
@@ -1413,7 +1363,7 @@ components:
           example: 0
         presence_timeout:
           type: integer
-          description: "Tempo em segundos que a presença deve permanecer contínua antes do religamento automático"
+          description: "Tempo em minutos que a presença deve permanecer contínua antes do religamento automático"
           example: 600
         receiver:
           type: integer
@@ -1728,56 +1678,45 @@ components:
     Voucher:
       type: object
       description: |
-        Voucher de acesso pendente. O `voucher_code` só é retornado no momento da criação (`POST /access/vouchers`) e não pode ser recuperado depois.
+        Voucher de acesso pendente.
+      required:
+        - voucher_id
+        - uses_remaining
       properties:
-        voucher_id:
+        expires_at:
           type: string
-          format: uuid
-          description: Identificador do voucher, usado para listagem e remoção.
-          example: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
-        device_id:
-          type: integer
-          format: int64
-          description: Número de série do dispositivo que emitiu o voucher.
-          example: 1234567890
-        role:
-          $ref: "#/components/schemas/AccessRole"
-        grantee_email:
-          type: string
-          format: email
-          nullable: true
-          description: E‑mail do usuário que receberá o acesso, quando informado na emissão.
-          example: "maria@brise.com.br"
+          description: Instante em que o voucher deixa de ser válido.
+          example: "2026-09-16T19:27:51"
         uses_remaining:
           type: integer
           format: int32
           description: Resgates ainda disponíveis para este voucher.
           example: 1
-        created_at:
+        voucher_id:
           type: string
-          format: date-time
-          description: Instante de emissão do voucher (UTC).
-          example: "2026-08-28T12:00:00Z"
-        expires_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: Instante em que o voucher deixa de ser válido (UTC). Sempre presente no firmware atual (TTL fixo de 3600 s a partir de `created_at`).
-          example: "2026-08-28T13:00:00Z"
-        path:
-          type: string
-          nullable: true
-          description: |
-            Caminho de grupos/subgrupos sugerido por quem compartilhou para posicionar o equipamento na árvore do destinatário. Informativo, sem efeito de autorização.
-          example: "Matriz/Piso 2/Sala de Reuniões"
+          format: uuid
+          description: Identificador do voucher.
+          example: "ed65b236-0fda-4bf5-a1b4-1a19cff4d443"
 
     VoucherCreated:
-      allOf:
-        - $ref: "#/components/schemas/Voucher"
-        - type: object
-          properties:
-            voucher_code:
-              type: string
-              description: |
-                Artefato assinado pelo dispositivo, transmitido ao destinatário e apresentado em `POST /access/redeem`. Retornado somente nesta resposta de criação.
-              example: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9..."
+      type: object
+      description: |
+        Voucher recém-criado.
+      required:
+        - expires_at
+        - voucher_code
+        - voucher_id
+      properties:
+        expires_at:
+          type: string
+          description: Data/hora de expiração do voucher (ISO 8601).
+          example: "2026-09-16T19:54:16"
+        voucher_code:
+          type: string
+          description: Artefato assinado transmitido ao destinatário e apresentado no resgate.
+          example: "eyJlbWwiOiJ0aWFnby5kYXZpbGFAYWdzdC5jb20uYnIiLCJleHAiOjE3ODk1ODg0NTYsImp0aSI6ImNiOGZhNzgwLTUyOGMtNDAxMi04Y2U1LTEyMThhODBlMWFkNCIsInB0aCI6IkFHU1QiLCJyb2xlIjoib3BlcmF0b3IiLCJzcmwiOjIwMDAwMSwidXNlcyI6MX0=.0rWrte0VnCtW6URvF/7/ExM5e1AV5z7A2w+MBVZiX+A="
+        voucher_id:
+          type: string
+          format: uuid
+          description: Identificador único do voucher gerado.
+          example: "cb8fa780-528c-4012-8ce5-1218a80e1ad4"
