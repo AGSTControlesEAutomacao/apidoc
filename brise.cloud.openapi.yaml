@@ -2383,7 +2383,11 @@ paths:
       tags:
         - Dispositivo
       summary: Estado AC e Sensores 🚩Adicionado
-      description: Retorna o estado atual configurado do Ar Condicionado e os valores aferidos pelos sensores do ambiente.
+      description: |
+        Retorna o estado do Ar Condicionado.
+
+        - Sem parâmetros (ou `fields=ac`): retorna apenas as chaves do objeto `ac`.
+        - `fields=all`: retorna também as leituras dos sensores (`sensors`) e um objeto `config` com as configurações do dispositivo e seu estado em tempo real (`config.status`).
       operationId: getACControl
       security:
         - bearerAuth: []
@@ -2395,13 +2399,77 @@ paths:
             type: string
           description: Número de série do dispositivo.
           example: "200000"
+        - name: fields
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [ac, all]
+            default: ac
+          description: |
+            Define o conjunto de dados retornados.
+            - `ac` (padrão): retorna apenas o estado do Ar Condicionado.
+            - `all`: retorna o estado do AC, sensores e configurações completas com estado.
       responses:
         "200":
-          description: Estado do AC e leitura dos sensores.
+          description: |
+            Estado do AC e, se `fields=all`, sensores e configurações.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ACControlResponse"
+                oneOf:
+                  - $ref: "#/components/schemas/ACControl"
+                  - $ref: "#/components/schemas/ACControlResponseAll"
+              examples:
+                apenas_ac:
+                  summary: Resposta padrão (fields=ac)
+                  value:
+                    power: 1
+                    setpoint: 22
+                    fan: 0
+                    mode: 1
+                    sw_v: 1
+                    sw: 1
+                    fast: 0
+                    sleep: 0
+                completo:
+                  summary: Resposta completa (fields=all)
+                  value:
+                    ac:
+                      power: 1
+                      setpoint: 22
+                      fan: 0
+                      mode: 1
+                      sw_v: 1
+                      sw: 1
+                      fast: 0
+                      sleep: 0
+                    sensors:
+                      temp: 24.5
+                      temp_max: 29.0
+                      temp_min: 18.5
+                      temp_avg: 23.2
+                      presence: 1
+                      presence_du: 1800
+                      machine_st: 1
+                    config:
+                      absence_shutdown: 0
+                      absence_timeout: 1800
+                      anonymous_control: 0
+                      auto_clean: 0
+                      ir_jammer: 0
+                      light_comfort: 0
+                      max_temp_limit_value: 26
+                      temp_limit: 0
+                      min_temp_limit_value: 20
+                      presence_resume: 0
+                      presence_timeout: 600
+                      resilient_mode: 0
+                      status:
+                        receiver: 0
+                        autoCleanTimer: 0
+                        autoCleanTotalTime: 0
+                        autoCleanRunning: 0
         "401":
           description: Token de autenticação Cloud ausente ou inválido.
           content:
@@ -2947,7 +3015,7 @@ paths:
         - Dispositivo
       summary: Alterar Configurações 🚩Adicionado
       description: |
-        Altera as configurações do dispositivo.
+        Altera as configurações do dispositivo.  
         O envio de cada chave é opcional. Se a chave não for enviada, o valor correspondente não será alterado.
       operationId: updateDeviceConfig
       security:
@@ -2985,6 +3053,38 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
           description: Acesso negado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /config/status/{device}:
+    get:
+      tags:
+        - Dispositivo
+      summary: Estado de Configurações 🚩Adicionado
+      description: |
+        Retorna dados de estado derivados das configurações do dispositivo. Estes dados refletem processos internos em andamento.
+      operationId: getDeviceConfigStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: device
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Número de série do dispositivo.
+          example: "200000"
+      responses:
+        "200":
+          description: Estado atual das configurações.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceConfigStatus"
+        "401":
+          description: Token ausente ou inválido.
           content:
             application/json:
               schema:
@@ -3130,30 +3230,34 @@ components:
           type: integer
           description: "Tempo em segundos que a presença deve permanecer contínua antes do religamento automático"
           example: 600
-        receiver:
-          type: integer
-          description: "Sensor de receptor e emissor infravermelho (0: interno, 1: externo)"
-          enum: [0, 1]
-          example: 0
         resilient_mode:
           type: integer
           description: "Mantém o equipamento sincronizado com o estado definido pelo sistema de automação (0: desabilitado, 1: habilitado)"
           enum: [0, 1]
           example: 0
+
+    DeviceConfigStatus:
+      type: object
+      description: |
+        Estado derivado das configurações do dispositivo, atualizado em tempo real.
+        Estes dados refletem processos internos em andamento e devem ser consultados com frequência para compor o dashboard.
+      properties:
+        receiver:
+          type: integer
+          description: "Sensor de receptor e emissor infravermelho ativo no momento (0: interno, 1: externo)"
+          enum: [0, 1]
+          example: 0
         autoCleanTimer:
           type: integer
-          description: "Indica se um ciclo de Limpeza Automática está em execução."
-          readOnly: true
+          description: "Tempo restante do ciclo de Limpeza Automática em execução, em segundos. Zero se não há ciclo ativo."
           example: 1212
         autoCleanTotalTime:
           type: integer
-          description: "Tempo decorrido do ciclo de limpeza, em segundos."
-          readOnly: true
+          description: "Tempo decorrido do ciclo de limpeza atual, em segundos."
           example: 2323
         autoCleanRunning:
           type: integer
           description: "Tempo total previsto para o ciclo de limpeza, em segundos."
-          readOnly: true
           example: 23
 
     ACControl:
@@ -3249,6 +3353,23 @@ components:
           $ref: "#/components/schemas/ACControl"
         sensors:
           $ref: "#/components/schemas/ACSensors"
+
+    ACControlResponseAll:
+      type: object
+      description: |
+        Resposta completa retornada quando `fields=all`. Inclui o estado do AC, sensores e configurações do dispositivo com estado em tempo real.
+      properties:
+        ac:
+          $ref: "#/components/schemas/ACControl"
+        sensors:
+          $ref: "#/components/schemas/ACSensors"
+        config:
+          allOf:
+            - $ref: "#/components/schemas/DeviceConfig"
+            - type: object
+              properties:
+                status:
+                  $ref: "#/components/schemas/DeviceConfigStatus"
 
     EventLog:
       type: object
