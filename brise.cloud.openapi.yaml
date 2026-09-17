@@ -2805,7 +2805,6 @@ paths:
             schema:
               type: object
               required:
-                - voucher_code
                 - subject_id
               properties:
                 voucher_code:
