@@ -835,7 +835,6 @@ paths:
                 relogio_invalido:
                   value:
                     error: CLOCK_UNAVAILABLE
-
     get:
       tags:
         - Acesso
@@ -1028,6 +1027,7 @@ paths:
                 relogio_invalido:
                   value:
                     error: CLOCK_UNAVAILABLE
+  
   /access/token:
     delete:
       tags:

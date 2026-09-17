@@ -2643,7 +2643,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-
     get:
       tags:
         - Acesso
@@ -2697,7 +2696,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-
     delete:
       tags:
         - Acesso
@@ -2737,12 +2735,6 @@ paths:
                     example: true
         "400":
           description: Requisição inválida.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Token ausente ou inválido.
           content:
             application/json:
               schema:
