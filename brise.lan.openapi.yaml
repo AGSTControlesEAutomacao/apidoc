@@ -974,7 +974,7 @@ paths:
       responses:
         "200":
           description: |
-            Voucher resgatado. O `access_token` deve ser enviado no cabeçalho `Authorization` das requisições autenticadas subsequentes.
+            Convite aceito com sucesso. O `access_token` deve ser enviado no cabeçalho `Authorization` das requisições autenticadas subsequentes.
           content:
             application/json:
               schema:
@@ -997,29 +997,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: |
-            Voucher inválido: a assinatura não confere ou não foi emitido por este dispositivo.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                invalido:
-                  value:
-                    error: INVALID_VOUCHER
-        "404":
-          description: Voucher desconhecido — removido pelo proprietário ou nunca emitido por este dispositivo.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                inexistente:
-                  value:
-                    error: VOUCHER_NOT_FOUND
         "409":
-          description: Voucher já resgatado o número máximo de vezes.
+          description: Voucher já resgatado o número máximo de vezes ou removido.
           content:
             application/json:
               schema:
@@ -1038,13 +1017,17 @@ paths:
                 expirado:
                   value:
                     error: VOUCHER_EXPIRED
-        "429":
-          description: Tentativas de resgate em excesso. Aguarde antes de tentar novamente.
+        "503":
+          description: |
+            O dispositivo não possui um relógio válido e não está apto a resgatar vouchers com prazo de validade.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-
+              examples:
+                relogio_invalido:
+                  value:
+                    error: CLOCK_UNAVAILABLE
   /access/token:
     delete:
       tags:
@@ -1308,7 +1291,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-
 
   /config:
     get:

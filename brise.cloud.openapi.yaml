@@ -2821,7 +2821,7 @@ paths:
       responses:
         "200":
           description: |
-            Convite aceito com sucesso. Retorna apenas o `access_token`.
+            Convite aceito com sucesso. O `access_token` deve ser enviado no cabeçalho `Authorization` das requisições autenticadas subsequentes.
           content:
             application/json:
               schema:
@@ -2844,12 +2844,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Token de acesso ausente ou inválido.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
         "403":
           description: "Tentativa de resgate não autorizada (ex: ID divergente do usuário autenticado)."
           content:
@@ -2860,16 +2854,6 @@ paths:
                 negado:
                   value:
                     error: ACCESS_DENIED
-        "404":
-          description: Voucher não encontrado — removido pelo proprietário ou nunca emitido por este dispositivo.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                inexistente:
-                  value:
-                    error: VOUCHER_NOT_FOUND
         "409":
           description: Voucher já resgatado o número máximo de vezes.
           content:
@@ -2890,12 +2874,6 @@ paths:
                 expirado:
                   value:
                     error: VOUCHER_EXPIRED
-        "429":
-          description: Tentativas de resgate em excesso. Aguarde antes de tentar novamente.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
 
   /access/token/{device}:
     delete:
@@ -2967,7 +2945,6 @@ paths:
                 inexistente:
                   value:
                     error: USER_NOT_FOUND
-
 
   /config/{device}:
     get:
