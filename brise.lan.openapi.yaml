@@ -779,7 +779,7 @@ paths:
                   example: "Matriz/Piso 2/Sala de Reuniões"
       responses:
         "201":
-          description: Voucher criado.
+          description: Compartilhamento (Voucher) criado.
           content:
             application/json:
               schema:
@@ -792,20 +792,14 @@ paths:
                     voucher_code: "eyJlbWwiOiJ0aWFnby5kYXZpbGFAYWdzdC5jb20uYnIiLCJleHAiOjE3ODk1ODg0NTYsImp0aSI6ImNiOGZhNzgwLTUyOGMtNDAxMi04Y2U1LTEyMThhODBlMWFkNCIsInB0aCI6IkFHU1QiLCJyb2xlIjoib3BlcmF0b3IiLCJzcmwiOjIwMDAwMSwidXNlcyI6MX0=.0rWrte0VnCtW6URvF/7/ExM5e1AV5z7A2w+MBVZiX+A="
                     voucher_id: "cb8fa780-528c-4012-8ce5-1218a80e1ad4"
         "400":
-          description: Parâmetros inválidos (papel desconhecido ou valores fora do intervalo permitido).
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Token de acesso ausente ou inválido.
+          description: Parâmetros inválidos.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "403":
           description: |
-            O token autenticado não tem privilégio para gerar vouchers (`manager`/`owner`), ou tentou conceder um papel superior ao próprio.
+            O usuário não possui privilégio para compartilhar o dispositivo, ou tentou conceder um papel superior ao próprio.
           content:
             application/json:
               schema:
@@ -820,6 +814,28 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Falha ao persistir o voucher na memória não volátil.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                falha_nvs:
+                  value:
+                    error: NVS_WRITE_ERROR
+        "503":
+          description: |
+            O dispositivo não possui um relógio válido e não está apto a emitir vouchers com prazo de validade.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                relogio_invalido:
+                  value:
+                    error: CLOCK_UNAVAILABLE
+
     get:
       tags:
         - Acesso

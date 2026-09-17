@@ -2617,7 +2617,7 @@ paths:
                     Sugestão do proprietário de onde o equipamento deve ser posicionado na árvore de grupos do destinatário (ex.: `Matriz/Piso 2/Sala de Reuniões`).
                   example: "Matriz/Piso 2/Sala de Reuniões"
       responses:
-        "201":
+        "200":
           description: Compartilhamento iniciado e notificação enviada.
           content:
             application/json:
@@ -2636,20 +2636,9 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Token de acesso ausente ou inválido.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
         "403":
-          description: O usuário não possui privilégio para compartilhar o dispositivo.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Dispositivo não encontrado.
+          description: |
+            O usuário não possui privilégio para compartilhar o dispositivo, ou tentou conceder um papel superior ao próprio.
           content:
             application/json:
               schema:
