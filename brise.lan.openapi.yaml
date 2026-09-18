@@ -64,6 +64,9 @@ tags:
   - name: Dispositivo
     description:  |
       Monitoramento e controle direto do Ar Condicionado via dispositivo, além de configuração de funções especiais.
+  - name: Protocolo IR
+    description: |
+      Gerenciamento do protocolo infravermelho utilizado pelo dispositivo para interfacear com a máquina de Ar Condicionado.
 
 paths:
   /network/status:
@@ -1378,6 +1381,258 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /protocol:
+    get:
+      tags:
+        - Protocolo IR
+      summary: Protocolo IR 🚩Adicionado
+      description: |
+        Retorna o protocolo infravermelho atualmente armazenado na memória não volátil do dispositivo.
+
+        O protocolo inclui os **timings** de pulso e o **dicionário de comandos** utilizados para controlar a máquina de Ar Condicionado.
+      operationId: getIRProtocol
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Protocolo IR armazenado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IRProtocol"
+              examples:
+                midea:
+                  summary: Protocolo Midea (parcial)
+                  value:
+                    id: 111
+                    brand: "Midea_PeD"
+                    maxlen: 20
+                    timings:
+                      "0": "01CB8269"
+                      "1": "05FE8269"
+                      H: "10DF917C"
+                      F: "0000826C"
+                      G: "1406826C"
+                    commands:
+                      "848": "Af4wsk17hOAfAgH+MLJNe4TgHwM="
+                      "8736": "Af4wsk2fYBDvAgH+MLJNn2AQ7wM="
+                      "8752": "Af4wsk1foBDvAgH+MLJNX6AQ7wM="
+        "403":
+          description: O usuário autenticado não possui permissão.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                negado:
+                  value:
+                    error: ACCESS_DENIED
+        "404":
+          description: Nenhum protocolo IR configurado no dispositivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                sem_protocolo:
+                  value:
+                    error: PROTOCOL_NOT_FOUND
+
+    post:
+      tags:
+        - Protocolo IR
+      summary: Protocolo IR 🚩Adicionado
+      description: |
+        Grava o protocolo infravermelho na memória não volátil do dispositivo.
+
+        Aceita dois modos de operação:
+
+        - **Protocolo completo**: envie o objeto com `id`, `brand`, `maxlen`, `timings` e `commands`. Substitui integralmente o protocolo armazenado.
+        - **Atualização parcial de comandos**: envie apenas `commands`. Os timings existentes são mantidos e apenas os comandos informados são adicionados/substituídos.
+
+        ### Formato dos Timings
+
+        Cada entrada do objeto `timings` mapeia um token de símbolo IR para uma string hexadecimal que codifica o par `(mark, space)` em unidades de clock do periférico RMT:
+
+        - **Normal** (8 hex chars): `SSSSMMM` onde `MMMM` = mark com bit 15 em 1 (`0x8000 | mark`), `SSSS` = space.
+        - **Mega** (12 hex chars, para gaps longos ≥ 32768 µs): `0000MMMMHHHH LLLL` — mark com MSW e LSW do space separados.
+
+        ### Formato dos Comandos
+
+        Cada entrada de `commands` mapeia um ID numérico (como string decimal) para um bytecode Base64 que codifica a sequência de símbolos IR:
+
+        | Byte | Significado |
+        |---|---|
+        | `0x01` | Header (`H`) |
+        | `0x02` | Gap (`G`) |
+        | `0x03` | Footer (`F`) |
+        | `0xFE` + N + bytes | N bits de dados (big-endian, empacotados) |
+        | `0x04`–`0x0E` | Símbolo extra (`4`–`9`, `A`–`E`) |
+
+        ### ID de Comando
+
+        O ID numérico codifica o estado completo da máquina usando a fórmula: |  
+        id = (power × 7680) + ((temp − 16) × 480) + (mode × 80) + (fan × 16) + (swingV × 8) + (swingH × 4) + (sleep × 2) + fast
+      operationId: postIRProtocol
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IRProtocol"
+            examples:
+              completo:
+                summary: Upload de protocolo completo
+                value:
+                  id: 111
+                  brand: "Midea_PeD"
+                  maxlen: 20
+                  timings:
+                    "0": "01CB8269"
+                    "1": "05FE8269"
+                    H: "10DF917C"
+                    F: "0000826C"
+                    G: "1406826C"
+                  commands:
+                    "848": "Af4wsk17hOAfAgH+MLJNe4TgHwM="
+                    "8736": "Af4wsk2fYBDvAgH+MLJNn2AQ7wM="
+              parcial:
+                summary: Atualização parcial (apenas um comando)
+                value:
+                  commands:
+                    "848": "Af4wsk17hOAfAgH+MLJNe4TgHwM="
+      responses:
+        "200":
+          description: Protocolo gravado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: Payload inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Acesso negado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Falha ao gravar o protocolo na memória não volátil.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                falha_nvs:
+                  value:
+                    error: NVS_WRITE_ERROR
+
+  /protocol/cmd:
+    get:
+      tags:
+        - Protocolo IR
+      summary: Capturar IR 🚩Adicionado
+      description: |
+        Lê o último frame infravermelho capturado pelo sensor do dispositivo, retornando o stream RMT bruto codificado em Base64.
+
+        Utilizado durante o processo de aprendizado de protocolo: o usuário aponta o controle remoto físico para o dispositivo e pressiona um botão; em seguida chama este endpoint para obter o sinal capturado.
+
+        O stream Base64 retornado no campo `bs` representa uma sequência de itens RMT (4 bytes cada, big-endian):
+        - Bits 0–14: duração do pulso (mark) em ticks do periférico RMT.
+        - Bits 16–30: duração do espaço (space).
+        - Space = 0 indica formato mega (gap longo), com o próximo item contendo o espaço real em 31 bits.
+      operationId: captureIRCmd
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Frame IR capturado com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IRRawFrame"
+              examples:
+                frame:
+                  value:
+                    bs: "EQBJ/xEASf8RAEn/EQBJABEASf8="
+        "403":
+          description: O usuário autenticado não possui permissão.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                negado:
+                  value:
+                    error: ACCESS_DENIED
+        "404":
+          description: Nenhum sinal IR disponível.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                sem_sinal:
+                  value:
+                    error: NO_IR_SIGNAL
+
+    post:
+      tags:
+        - Protocolo IR
+      summary: Reproduzir IR 🚩Adicionado
+      description: |
+        Emite um frame infravermelho arbitrário pelo emissor do dispositivo.
+
+        Utilizado para verificação e teste durante o processo de aprendizado de protocolo: o usuário envia o sinal capturado de volta ao dispositivo para confirmar que o AC responde corretamente.
+
+        O campo `bs` deve conter o mesmo formato de stream RMT retornado por `GET /protocol/cmd`.
+      operationId: playIRCmd
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IRRawFrame"
+            examples:
+              frame:
+                value:
+                  bs: "EQBJ/xEASf8RAEn/EQBJABEASf8="
+      responses:
+        "200":
+          description: Frame IR emitido com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: Payload inválido — `bs` ausente ou não é Base64 válido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Acesso negado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1832,3 +2087,78 @@ components:
           format: uuid
           description: Identificador único do voucher gerado.
           example: "cb8fa780-528c-4012-8ce5-1218a80e1ad4"
+
+    IRTimings:
+      type: object
+      description: |
+        Dicionário de timings do protocolo IR. Cada chave é um token de símbolo (ex.: `"0"`, `"1"`, `"H"`, `"F"`, `"G"`, `"4"`…`"E"`) e o valor é uma string hexadecimal que codifica o par `(mark, space)` em ticks do periférico RMT do ESP32.
+
+        **Formato normal** (8 hex chars): `SSSSMMM` onde `MMMM` = mark com bit 15 em 1 (`0x8000 | mark`), `SSSS` = space.
+
+        **Formato mega** (12 hex chars, para gaps longos ≥ 32.768 µs): `0000MMMM` + MSW(space) + LSW(space).
+      additionalProperties:
+        type: string
+        pattern: '^([0-9A-Fa-f]{8}|[0-9A-Fa-f]{12})$'
+        description: Valor hex de 8 ou 12 caracteres representando o par (mark, space).
+      example:
+        "0": "01CB8269"
+        "1": "05FE8269"
+        H: "10DF917C"
+        F: "0000826C"
+        G: "1406826C"
+
+    IRCommands:
+      type: object
+      description: |
+        Dicionário de comandos do protocolo IR. Cada chave é o ID numérico do estado da máquina (como string decimal) e o valor é o bytecode do comando codificado em Base64.
+
+        O ID numérico codifica o estado completo da máquina:  
+        id = (power × 7680) + ((temp − 16) × 480) + (mode × 80) + (fan × 16) + (swingV × 8) + (swingH × 4) + (sleep × 2) + fast
+      additionalProperties:
+        type: string
+        format: byte
+        description: Bytecode do comando IR codificado em Base64.
+      example:
+        "848": "Af4wsk17hOAfAgH+MLJNe4TgHwM="
+        "8736": "Af4wsk2fYBDvAgH+MLJNn2AQ7wM="
+        "8752": "Af4wsk1foBDvAgH+MLJNX6AQ7wM="
+
+    IRProtocol:
+      type: object
+      description: Protocolo infravermelho completo utilizado pelo dispositivo para controlar a máquina de Ar Condicionado.
+      properties:
+        id:
+          type: integer
+          description: Identificador numérico do protocolo.
+          example: 1
+        brand:
+          type: string
+          description: Nome do fabricante do protocolo.
+          example: "Midea"
+        maxlen:
+          type: integer
+          description: Comprimento máximo em bytes do bytecode de qualquer comando deste protocolo.
+          example: 20
+        timings:
+          $ref: "#/components/schemas/IRTimings"
+        commands:
+          $ref: "#/components/schemas/IRCommands"
+
+    IRRawFrame:
+      type: object
+      description: |
+        Frame infravermelho bruto no formato de stream RMT, codificado em Base64.
+
+        Cada item do stream ocupa 4 bytes (big-endian):
+        - Bits 0–14: duração do pulso (mark) em ticks do RMT.
+        - Bit 15: nível lógico do mark (sempre 1 no periférico RMT).
+        - Bits 16–30: duração do espaço (space).
+        - Space = 0 indica formato mega (gap longo ≥ 32.768 µs); o próximo item contém o espaço real em 31 bits.
+      required:
+        - bs
+      properties:
+        bs:
+          type: string
+          format: byte
+          description: Stream RMT bruto codificado em Base64.
+          example: "EQBJ/xEASf8RAEn/EQBJABEASf8="
