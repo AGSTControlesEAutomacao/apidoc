@@ -1152,17 +1152,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /control:
+  /device:
     get:
       tags:
         - Dispositivo
-      summary: Estado AC e Sensores 🚩Adicionado
+      summary: Dispositivo 🚩Adicionado
       description: |
-        Retorna o estado do Ar Condicionado.
+        Retorna um resumo do dispositivo, com o nível de detalhe escolhido pelo parâmetro `fields`.
 
-        - Sem parâmetros (ou `fields=ac`): retorna apenas as chaves do objeto `ac`.
-        - `fields=all`: retorna também as leituras dos sensores (`sensors`) e um objeto `config` com as configurações do dispositivo e seu estado em tempo real (`config.status`).
-      operationId: getACControl
+      operationId: getDeviceOverview
       security:
         - bearerAuth: []
       parameters:
@@ -1171,74 +1169,99 @@ paths:
           required: false
           schema:
             type: string
-            enum: [ac, all]
-            default: ac
+            enum: [all]
           description: |
-            Define o conjunto de dados retornados.
-            - `ac` (padrão): retorna apenas o estado do Ar Condicionado.
-            - `all`: retorna o estado do AC, sensores e configurações completas com estado.
+            Se omitido, retorna o resumo mínimo de "ping". `all` retorna o estado completo do dispositivo.
       responses:
         "200":
           description: |
-            Estado do AC e, se `fields=all`, sensores e configurações.
+            Resumo mínimo (padrão, sem `fields`) ou o estado completo (`fields=all`).
           content:
             application/json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/ACControl"
-                  - $ref: "#/components/schemas/ACControlResponseAll"
+                  - $ref: "#/components/schemas/DevicePing"
+                  - $ref: "#/components/schemas/DeviceStateAll"
               examples:
-                apenas_ac:
-                  summary: Resposta padrão (fields=ac)
+                ping:
+                  summary: Resumo mínimo (padrão, sem `fields`)
                   value:
-                    power: 1
-                    setpoint: 22
-                    fan: 0
-                    mode: 1
-                    sw_v: 1
-                    sw: 1
-                    fast: 0
-                    sleep: 0
-                completo:
-                  summary: Resposta completa (fields=all)
+                    power: true
+                    temp: 24.5
+                all:
+                  summary: fields=all
                   value:
                     ac:
-                      power: 1
+                      power: true
                       setpoint: 22
                       fan: 0
                       mode: 1
-                      sw_v: 1
-                      sw: 1
-                      fast: 0
-                      sleep: 0
+                      sw_v: true
+                      sw: true
+                      fast: false
+                      sleep: false
                     sensors:
                       temp: 24.5
                       temp_max: 29.0
                       temp_min: 18.5
                       temp_avg: 23.2
-                      presence: 1
+                      presence: true
                       presence_du: 1800
-                      machine_st: 1
+                      machine_st: true
                     config:
-                      absence_shutdown: 0
+                      absence_shutdown: false
                       absence_timeout: 1800
-                      anonymous_control: 0
-                      auto_clean: 0
-                      ir_jammer: 0
-                      light_comfort: 0
-                      max_temp_limit_value: 26
-                      temp_limit: 0
-                      min_temp_limit_value: 20
-                      presence_resume: 0
+                      anonymous_control: false
+                      auto_clean: false
+                      ir_jammer: false
+                      light_comfort: false
+                      temp_limit: false
+                      temp_limit_min_value: 20
+                      temp_limit_max_value: 26
+                      presence_resume: false
                       presence_timeout: 600
-                      resilient_mode: 0
-                      status:
-                        receiver: 0
-                        autoCleanTimer: 0
-                        autoCleanTotalTime: 0
-                        autoCleanRunning: 0
-        "401":
-          description: Token ausente ou inválido.
+                      resilient_mode: false
+                    status:
+                      receiver: false
+                      autoCleanTimer: 0
+                      autoCleanTotalTime: 0
+                      autoCleanRunning: 0
+        "403":
+          description: O usuário autenticado não possui permissão para acessar o dispositivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /control:
+    get:
+      tags:
+        - Dispositivo
+      summary: Estado do AC 🚩Adicionado
+      description: |
+        Retorna o estado configurado do Ar Condicionado.
+
+      operationId: getACControl
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Estado do AC.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ACControl"
+              example:
+                power: true
+                setpoint: 22
+                fan: 0
+                mode: 1
+                sw_v: true
+                sw: true
+                fast: false
+                sleep: false
+        "403":
+          description: O usuário autenticado não possui permissão para acessar o dispositivo.
           content:
             application/json:
               schema:
@@ -1248,7 +1271,7 @@ paths:
         - Dispositivo
       summary: Alterar AC 🚩Adicionado
       description: |
-        Altera as configurações do ar condicionado.  
+        Altera as configurações do ar condicionado.
         O envio de cada chave é opcional. Se a chave não for enviada, o estado correspondente não será alterado.
       operationId: updateACControl
       security:
@@ -1263,14 +1286,14 @@ paths:
               ligar_modo_cool:
                 summary: Ligar no modo Frio, ventilação máxima, 20°C
                 value:
-                  power: 1
+                  power: true
                   setpoint: 20
                   fan: 3
                   mode: 1
               apenas_desligar:
                 summary: Desligar o ar condicionado
                 value:
-                  power: 0
+                  power: false
       responses:
         "200":
           description: Comando recebido e processado com sucesso.
@@ -1295,11 +1318,42 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /sensors:
+    get:
+      tags:
+        - Dispositivo
+      summary: Sensores 🚩Adicionado
+      description: Retorna as leituras dos sensores.
+      operationId: getDeviceSensors
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Leitura atual dos sensores.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ACSensors"
+              example:
+                temp: 24.5
+                temp_max: 29.0
+                temp_min: 18.5
+                temp_avg: 23.2
+                presence: true
+                presence_du: 1800
+                machine_st: true
+        "403":
+          description: O usuário autenticado não possui permissão para acessar.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /config:
     get:
       tags:
         - Dispositivo
-      summary: Obter Configurações 🚩Adicionado
+      summary: Configurações 🚩Adicionado
       description: Retorna as configurações atuais do dispositivo em relação as funções extras.
       operationId: getDeviceConfig
       security:
@@ -1311,8 +1365,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeviceConfig"
-        "401":
-          description: Token ausente ou inválido.
+        "403":
+          description: O usuário autenticado não possui permissão para acessar as configurações.
           content:
             application/json:
               schema:
@@ -1320,7 +1374,7 @@ paths:
     post:
       tags:
         - Dispositivo
-      summary: Alterar Configurações 🚩Adicionado
+      summary: Configurações 🚩Adicionado
       description: |
         Altera as configurações do dispositivo.
         O envio de cada chave é opcional. Se a chave não for enviada, o valor correspondente não será alterado.
@@ -1374,8 +1428,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeviceConfigStatus"
-        "401":
-          description: Token ausente ou inválido.
+        "403":
+          description: O usuário autenticado não possui permissão para acessar.
           content:
             application/json:
               schema:
@@ -1661,61 +1715,53 @@ components:
         Estas configurações dizem respeito a funções extras do dispositivo que persistem na memória (não são perdidas ao reiniciar o dispositivo), diferentemente das configurações de controle do Ar Condicionado.
       properties:
         absence_shutdown:
-          type: integer
-          description: "Habilita ou desabilita o desligamento automático por ausência (0: desabilitado, 1: habilitado)"
-          enum: [0, 1]
-          example: 0
+          type: boolean
+          description: "Habilita ou desabilita o desligamento automático por ausência (true: habilitado, false: desabilitado)"
+          example: false
         absence_timeout:
           type: integer
           description: "Tempo em minutos que o ambiente deve permanecer vazio antes do desligamento automático"
           example: 1800
         anonymous_control:
-          type: integer
-          description: "Habilita a possibilidade de controlar o AC sem autenticação (0: desabilitado, 1: habilitado)"
-          enum: [0, 1]
-          example: 0
+          type: boolean
+          description: "Habilita a possibilidade de controlar o AC sem autenticação (true: habilitado, false: desabilitado)"
+          example: false
         auto_clean:
-          type: integer
-          description: "Habilita ou desabilita a funcionalidade de limpeza automática (0: desabilitado, 1: habilitado)"
-          enum: [0, 1]
-          example: 0
+          type: boolean
+          description: "Habilita ou desabilita a funcionalidade de limpeza automática (true: habilitado, false: desabilitado)"
+          example: false
         ir_jammer:
-          type: integer
-          description: "Emite um sinal de interferência quando detecta um comando de infravermelho (0: desabilitado, 1: habilitado)"
-          enum: [0, 1]
-          example: 0
+          type: boolean
+          description: "Emite um sinal de interferência quando detecta um comando de infravermelho (true: habilitado, false: desabilitado)"
+          example: false
         light_comfort:
-          type: integer
-          description: "Desliga o LED de estado para não incomodar em ambientes escuros (0: desabilitado, 1: habilitado)"
-          enum: [0, 1]
-          example: 0
-        max_temp_limit_value:
-          type: integer
-          description: "Estabelece um limite máximo para o setpoint (°C)"
-          example: 26
+          type: boolean
+          description: "Desliga o LED de estado para não incomodar em ambientes escuros (true: habilitado, false: desabilitado)"
+          example: false
         temp_limit:
-          type: integer
-          description: "Habilita o limite para o setpoint ser configurado (0: desabilitado, 1: habilitado)"
-          enum: [0, 1]
-          example: 0
-        min_temp_limit_value:
+          type: boolean
+          description: "Habilita o limite para o setpoint ser configurado (true: habilitado, false: desabilitado)"
+          example: false
+        temp_limit_min_value:
           type: integer
           description: "Estabelece o limite mínimo para o setpoint (°C)"
           example: 20
-        presence_resume:
+        temp_limit_max_value:
           type: integer
-          description: "Habilita ou desabilita o religamento automático por presença (0: desabilitado, 1: habilitado)"
-          enum: [0, 1]
-          example: 0
+          description: "Estabelece um limite máximo para o setpoint (°C)"
+          example: 26
+        presence_resume:
+          type: boolean
+          description: "Habilita ou desabilita o religamento automático por presença (true: habilitado, false: desabilitado)"
+          example: false
         presence_timeout:
           type: integer
           description: "Tempo em minutos que a presença deve permanecer contínua antes do religamento automático"
           example: 600
         resilient_mode:
-          type: integer
-          description: "Mantém o equipamento sincronizado com o estado definido pelo sistema de automação (0: desabilitado, 1: habilitado)"
-          enum: [0, 1]
-          example: 0
+          type: boolean
+          description: "Mantém o equipamento sincronizado com o estado definido pelo sistema de automação (true: habilitado, false: desabilitado)"
+          example: false
 
     DeviceConfigStatus:
       type: object
@@ -1724,10 +1770,9 @@ components:
         Estes dados refletem processos internos em andamento e devem ser consultados com frequência para compor o dashboard.
       properties:
         receiver:
-          type: integer
-          description: "Sensor de receptor e emissor infravermelho ativo no momento (0: interno, 1: externo)"
-          enum: [0, 1]
-          example: 0
+          type: boolean
+          description: "Sensor de receptor e emissor infravermelho ativo no momento (true: externo, false: interno)"
+          example: false
         autoCleanTimer:
           type: integer
           description: "Tempo restante do ciclo de Limpeza Automática em execução, em segundos. Zero se não há ciclo ativo."
@@ -1746,10 +1791,9 @@ components:
       description: Representa o estado configurado do Ar Condicionado.
       properties:
         power:
-          type: integer
-          description: "0: Desligar, 1: Ligar (Se ausente, mantém o estado atual)"
-          enum: [0, 1]
-          example: 1
+          type: boolean
+          description: "true: Ligar, false: Desligar (Se ausente, mantém o estado atual)"
+          example: true
         setpoint:
           type: integer
           description: "Temperatura desejada (°C)"
@@ -1765,25 +1809,21 @@ components:
           enum: [0, 1, 2, 3, 4]
           example: 1
         sw_v:
-          type: integer
-          description: "Estado do defletor vertical"
-          enum: [0, 1]
-          example: 1
+          type: boolean
+          description: "Estado do defletor vertical (true: ativado, false: desativado)"
+          example: true
         sw:
-          type: integer
-          description: "Estado do defletor horizontal"
-          enum: [0, 1]
-          example: 1
+          type: boolean
+          description: "Estado do defletor horizontal (true: ativado, false: desativado)"
+          example: true
         fast:
-          type: integer
-          description: "Modo de resfriamento/aquecimento rápido (fast)"
-          enum: [0, 1]
-          example: 1
+          type: boolean
+          description: "Modo de resfriamento/aquecimento rápido (fast) (true: ativado, false: desativado)"
+          example: true
         sleep:
-          type: integer
-          description: "Modo noturno (sleep)"
-          enum: [0, 1]
-          example: 1
+          type: boolean
+          description: "Modo noturno (sleep) (true: ativado, false: desativado)"
+          example: true
         findme:
           type: integer
           description: "Sinal luminoso para identificar o dispositivo (1: reproduzir padrão luminoso)"
@@ -1812,45 +1852,50 @@ components:
           description: "Temperatura média do dia (°C)"
           example: 23.2
         presence:
-          type: integer
-          description: "Indica se há detecção de pessoas no ambiente (1) ou se não há (0)"
-          enum: [0, 1]
-          example: 1
+          type: boolean
+          description: "Indica se há detecção de pessoas no ambiente (true) ou se não há (false)"
+          example: true
         presence_du:
           type: integer
           description: "Tempo em segundos no estado atual de presença (com ou sem pessoas)"
           example: 1800
         machine_st:
-          type: integer
-          description: "Confirmação por sensor de que a máquina realmente encontra-se ligada (1) ou desligada (0)"
-          enum: [0, 1]
-          example: 1
+          type: boolean
+          description: "Confirmação por sensor de que a máquina realmente encontra-se ligada (true) ou desligada (false)"
+          example: true
 
-    ACControlResponse:
-      type: object
-      description: Resposta consolidada com o estado configurado e as leituras de ambiente.
-      properties:
-        ac:
-          $ref: "#/components/schemas/ACControl"
-        sensors:
-          $ref: "#/components/schemas/ACSensors"
-
-    ACControlResponseAll:
+    DevicePing:
       type: object
       description: |
-        Resposta completa retornada quando `fields=all`. Inclui o estado do AC, sensores e configurações do dispositivo com estado em tempo real.
+        Resumo mínimo do dispositivo, retornado por padrão em `GET /device` (sem `fields`). O
+        próprio HTTP 200 já confirma que o dispositivo respondeu (está alcançável); estes dois
+        campos bastam para saber se a máquina está ligada e a temperatura ambiente, sem o custo de
+        uma leitura completa — pensado para varreduras frequentes, especialmente em grupos com
+        muitos dispositivos.
+      properties:
+        power:
+          type: boolean
+          description: "Estado de ligado/desligado do Ar Condicionado (ver ACControl.power)"
+          example: true
+        temp:
+          type: number
+          description: "Temperatura ambiente atual aferida (°C) (ver ACSensors.temp)"
+          example: 24.5
+
+    DeviceStateAll:
+      type: object
+      description: |
+        Resposta completa retornada por `GET /device?fields=all`. Inclui o estado do AC, sensores,
+        configurações do dispositivo e o estado em tempo real derivado delas (`status`).
       properties:
         ac:
           $ref: "#/components/schemas/ACControl"
         sensors:
           $ref: "#/components/schemas/ACSensors"
         config:
-          allOf:
-            - $ref: "#/components/schemas/DeviceConfig"
-            - type: object
-              properties:
-                status:
-                  $ref: "#/components/schemas/DeviceConfigStatus"
+          $ref: "#/components/schemas/DeviceConfig"
+        status:
+          $ref: "#/components/schemas/DeviceConfigStatus"
 
     EventLog:
       type: object
