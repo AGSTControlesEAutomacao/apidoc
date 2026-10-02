@@ -1,7 +1,7 @@
 openapi: 3.0.4
 info:
   title: Brise Cloud API
-  version: 3.1.0
+  version: 3.1.1
   contact:
     name: AGST
     email: ped@agst.com.br
@@ -1212,7 +1212,7 @@ paths:
     get:
       tags:
         - Usuários
-      summary: Receber Tokens de APIs Externas 🚩Adicionado
+      summary: Receber Tokens de APIs Externas
       description: |
         Recebe os tokens de acesso para serviços externos IoT
       operationId: externalTokens
@@ -1937,7 +1937,7 @@ paths:
     get:
       tags:
         - Sistema
-      summary: Última Versão 🔑🚩Adicionado
+      summary: Última Versão 🔑
       description: |
         Retorna as informações sobre a versão mais recente do firmware disponível para download.
 
@@ -1984,7 +1984,7 @@ paths:
     get:
       tags:
         - Sistema
-      summary: Baixar Firmware 🔑🚩Adicionado
+      summary: Baixar Firmware 🔑
       description: |
         Permite baixar o arquivo binário (.bin) correspondente a uma versão específica de firmware.
 
@@ -2031,7 +2031,7 @@ paths:
     post:
       tags:
         - Sistema
-      summary: Atualização Download 🔑🚩Adicionado
+      summary: Atualização Download 🔑
       description: |
         Envia-se a URL de um servidor remoto que contém o arquivo binário de firmware.  
         O dispositivo fará o download do arquivo, verificará sua integridade, aplicará a atualização e reiniciará automaticamente.
@@ -2110,7 +2110,7 @@ paths:
     post:
       tags:
         - Rotinas
-      summary: Cria, Edita ou Reordena Rotinas 🔑🚩Adicionado
+      summary: Cria, Edita ou Reordena Rotinas 🔑
       description: |
         Encaminha uma solicitação ao dispositivo para realizar operações sobre rotinas de automação.
 
@@ -2258,7 +2258,7 @@ paths:
     get:
       tags:
         - Rotinas
-      summary: Lista Rotinas 🚩Adicionado
+      summary: Lista Rotinas
       description: |
         Retorna todas as rotinas configuradas no dispositivo, na ordem de prioridade, da mais alta para a mais baixa.
 
@@ -2317,7 +2317,7 @@ paths:
     delete:
       tags:
         - Rotinas
-      summary: Remove Rotina(s) 🚩Adicionado
+      summary: Remove Rotina(s)
       description: |
         Permite apagar rotinas de automação do dispositivo. Você pode apagar apenas uma rotina ou várias de uma vez só, dependendo de como envia a requisição.
       operationId: automationsDelete
@@ -2406,7 +2406,7 @@ paths:
     post:
       tags:
         - Acesso
-      summary: Compartilha Dispositivo 🚩Adicionado
+      summary: Compartilha Dispositivo
       description: |
         Inicia o fluxo de compartilhamento do dispositivo `{device}` para outro usuário.
         O serviço criará o convite pendente e notificará o destinatário via e-mail.
@@ -2476,7 +2476,7 @@ paths:
     get:
       tags:
         - Acesso
-      summary: Lista Convites 🚩Adicionado
+      summary: Lista Convites
       description: |
         Retorna os convites pendentes de acesso que foram emitidos para o dispositivo `{device}` e que ainda não foram aceitos nem revogados.
       security:
@@ -2529,7 +2529,7 @@ paths:
     delete:
       tags:
         - Acesso
-      summary: Cancela Convite 🚩Adicionado
+      summary: Cancela Convite
       description: |
         Revoga (cancela) um voucher pendente emitido para o dispositivo, tornando-o inválido para qualquer resgate futuro.
 
@@ -2586,7 +2586,7 @@ paths:
     get:
       tags:
         - Acesso
-      summary: Lista Compartilhamentos 🚩Adicionado
+      summary: Lista Compartilhamentos
       description: |
         Retorna a lista de dispositivos compartilhados com o usuário autenticado que estão aguardando sua aprovação (convites pendentes de aceite).
       security:
@@ -2614,7 +2614,7 @@ paths:
     post:
       tags:
         - Acesso
-      summary: Aceita Compartilhamento 🚩Adicionado
+      summary: Aceita Compartilhamento
       description: |
         Aprova o recebimento de um dispositivo compartilhado (resgata o voucher).
         O usuário vincula o dispositivo à sua conta e consolida a permissão recebida.
@@ -2700,7 +2700,7 @@ paths:
     delete:
       tags:
         - Acesso
-      summary: Revoga Acesso 🚩Adicionado
+      summary: Revoga Acesso
       description: |
         Remove o acesso de um determinado usuário ao dispositivo especificado.
         O serviço também comandará a revogação do token respectivo diretamente no dispositivo físico.
@@ -2771,7 +2771,7 @@ paths:
     get:
       tags:
         - Logs
-      summary: Lista Eventos 🚩Adicionado
+      summary: Lista Eventos
       description: |
         Retorna o histórico de eventos e ações executadas pelo ou através do dispositivo.
 
@@ -2844,7 +2844,7 @@ paths:
     get:
       tags:
         - Dispositivo
-      summary: Dispositivo 🚩Adicionado
+      summary: Dispositivo
       description: |
         Retorna um resumo do dispositivo, com o nível de detalhe escolhido pelo parâmetro `fields`.
         
@@ -2950,7 +2950,7 @@ paths:
     get:
       tags:
         - Dispositivo
-      summary: Estado AC 🚩Adicionado
+      summary: Estado AC
       description: |
         Retorna o estado do Ar Condicionado.
 
@@ -3063,7 +3063,7 @@ paths:
     post:
       tags:
         - Dispositivo
-      summary: Alterar AC 🚩Adicionado
+      summary: Alterar AC
       description: |
         Altera as configurações do ar condicionado.  
         O envio de cada chave é opcional. Se a chave não for enviada, o estado correspondente não será alterado.
@@ -3142,7 +3142,7 @@ paths:
     get:
       tags:
         - Dispositivo
-      summary: Sensores 🚩Adicionado
+      summary: Sensores
       description: Retorna as leituras dos sensores do dispositivo.
       operationId: getDeviceSensors
       security:
@@ -3193,7 +3193,7 @@ paths:
     get:
       tags:
         - Dispositivo
-      summary: Configurações 🚩Adicionado
+      summary: Configurações
       description: Retorna as configurações atuais do dispositivo em relação as funções extras.
       operationId: getDeviceConfig
       security:
@@ -3234,7 +3234,7 @@ paths:
     post:
       tags:
         - Dispositivo
-      summary: Configurações 🚩Adicionado
+      summary: Configurações
       description: |
         Altera as configurações do dispositivo.  
         O envio de cada chave é opcional. Se a chave não for enviada, o valor correspondente não será alterado.
@@ -3295,7 +3295,7 @@ paths:
     get:
       tags:
         - Dispositivo
-      summary: Estado de Configurações 🚩Adicionado
+      summary: Estado de Configurações
       description: |
         Retorna dados de estado derivados das configurações do dispositivo. Estes dados refletem processos internos em andamento.
       operationId: getDeviceConfigStatus
@@ -3339,7 +3339,7 @@ paths:
     get:
       tags:
         - Protocolo IR
-      summary: Protocolo IR 🚩Adicionado
+      summary: Protocolo IR
       description: |
         Retorna o protocolo infravermelho atualmente armazenado na memória não volátil do dispositivo.
 
@@ -3399,7 +3399,7 @@ paths:
     post:
       tags:
         - Protocolo IR
-      summary: Protocolo IR 🚩Adicionado
+      summary: Protocolo IR
       description: |
         Grava o protocolo infravermelho na memória não volátil do dispositivo.
 
@@ -3518,7 +3518,7 @@ paths:
     get:
       tags:
         - Protocolo IR
-      summary: Capturar IR 🚩Adicionado
+      summary: Capturar IR
       description: |
         Lê o último frame infravermelho capturado pelo sensor do dispositivo.
 
@@ -3610,7 +3610,7 @@ paths:
     post:
       tags:
         - Protocolo IR
-      summary: Reproduzir IR 🚩Adicionado
+      summary: Reproduzir IR
       description: |
         Emite um frame infravermelho arbitrário pelo emissor do dispositivo.
 
