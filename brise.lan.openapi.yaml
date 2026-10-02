@@ -1,7 +1,7 @@
 openapi: 3.0.4
 info:
   title: Brise LAN API
-  version: 3.0.0
+  version: 3.1.0
   contact:
     name: AGST
     email: ped@agst.com.br
@@ -45,9 +45,31 @@ servers:
 tags:
   - name: Rede
     description: Operações relacionadas à configuração e status da rede do dispositivo Brise.
+  - name: Sistema
+    description: |
+      Operações de manutenção e controle do sistema do dispositivo Brise.
+
+      > ⚠️ **Aviso**: Alguns endpoints desta categoria são de uso interno e não devem ser expostos publicamente.
+  - name: Acesso
+    description: |
+      Operações relacionadas ao controle de acesso e compartilhamento de dispositivos Brise.
+
+      Permite gerar vouchers para conceder acesso a outros usuários e resgatar esses vouchers para obter acesso ao dispositivo.
+  - name: Rotinas
+    description:  |
+      Gerenciamento de rotinas de automação executadas localmente pelo dispositivo.
+  - name: Logs
+    description: |
+      Consulta aos históricos de eventos, dados de utilização e registros de temperatura do dispositivo.
+  - name: Dispositivo
+    description:  |
+      Monitoramento e controle direto do Ar Condicionado via dispositivo, além de configuração de funções especiais.
+  - name: Protocolo IR
+    description: |
+      Gerenciamento do protocolo infravermelho utilizado pelo dispositivo para interfacear com a máquina de Ar Condicionado.
 
 paths:
-  /network/status:
+  /network:
     get:
       tags:
         - Rede
@@ -69,6 +91,10 @@ paths:
               schema:
                 type: object
                 properties:
+                  hostname:
+                    type: string
+                    description: Nome do dispositivo
+                    example: BriseII
                   station:
                     type: object
                     description: Informações da interface Wi-Fi no modo estação (cliente).
@@ -101,6 +127,10 @@ paths:
                         type: string
                         description: Endereço IP do gateway configurado.
                         example: "192.168.0.1"
+                      ip6_station:
+                        type: string
+                        description: Endereço IPv6 da interface Wi-Fi (modo estação).
+                        example: "fe80::1c2b:3d4e:5f6a:7b8c"
                       mac_station:
                         type: string
                         description: Endereço MAC físico da interface Wi-Fi (modo estação).
@@ -145,12 +175,6 @@ paths:
                         type: string
                         description: Endereço MAC físico da interface Wi-Fi em modo AP.
                         example: "84:CC:A8:42:1F:7C"
-                      dns_ap:
-                        type: array
-                        description: Lista de servidores DNS configurados para o ponto de acesso.
-                        items:
-                          type: string
-                        example: "192.168.4.1"
 
                   eth:
                     type: object
@@ -192,6 +216,7 @@ paths:
                 exemplo_completo:
                   summary: Exemplo com todas as interfaces ativas
                   value:
+                    hostname: "BriseII"
                     station:
                       ssid_station: "RedeBrise"
                       channel_station: 6
@@ -210,7 +235,6 @@ paths:
                       netmask_ap: "255.255.255.0"
                       gateway_ap: "192.168.4.1"
                       mac_ap: "84:CC:A8:42:1F:7C"
-                      dns_ap: "192.168.4.1"
                     eth:
                       dhcp: false
                       ip_eth: "192.168.0.106"
@@ -227,16 +251,17 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
 
   /network/wifi:
-    put:
+    post:
       tags:
         - Rede
-      summary: Configura Wi-Fi
+      summary: Configura Wi-Fi ✏️Alterado
       description: |
         Define o SSID e a senha da rede Wi-Fi à qual o dispositivo Brise deve se conectar.  
         Após a atualização, o dispositivo tentará conectar automaticamente à nova rede.
 
         > ⚠️ Durante o processo de troca de rede, a conexão atual será interrompida.  
-        > O dispositivo aplicará as novas credenciais e reiniciará o módulo de rede.
+        > O dispositivo aplicará as novas credenciais e reiniciará o módulo de rede.  
+        > 🔑 **Privado:** No primeiro provisionamento, o dispositivo aceita a requisição sem Bearer Token e associa a configuração ao `owner` informado.
       security:
         - bearerAuth: []
       requestBody:
@@ -249,6 +274,10 @@ paths:
                 - ssid
                 - password
               properties:
+                hostname:
+                  type: string
+                  description: Nome do dispositivo.
+                  example: "BriseII"
                 ssid:
                   type: string
                   description: Nome da rede Wi-Fi (SSID) à qual o dispositivo deve se conectar.
@@ -257,9 +286,16 @@ paths:
                   type: string
                   description: Senha da rede Wi-Fi. Deve conter entre 8 e 63 caracteres para redes WPA/WPA2/WPA3.
                   example: "12345678"
+                owner_id:
+                  type: string
+                  description: 🔑 Identificador do usuário proprietário. Obrigatório no primeiro provisionamento.
+                  example: "550e8400-e29b-41d4-a716-446655440000"
       responses:
         "200":
-          description: Configuração aplicada com sucesso.
+          description: |
+            Configuração aplicada com sucesso.
+
+            Durante o primeiro provisionamento, a resposta também fornece o Access Token que deverá ser utilizado pelo cliente nas requisições autenticadas subsequentes.
           content:
             application/json:
               schema:
@@ -269,11 +305,17 @@ paths:
                     type: boolean
                     description: Indica se a configuração foi aplicada corretamente.
                     example: true
+                  access_token:
+                    type: string
+                    description: |
+                      Access Token inicial do dispositivo. Retornado durante o primeiro provisionamento e utilizado para autenticar as requisições subsequentes.
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
               examples:
                 sucesso:
                   summary: Exemplo de sucesso
                   value:
                     success: true
+                    access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
         "400":
           description: Requisição inválida. Verifique os dados enviados.
           content:
@@ -283,10 +325,13 @@ paths:
     get:
       tags:
         - Rede
-      summary: Lista redes Wi-Fi
+      summary: Lista redes Wi-Fi ✏️Alterado
       description: |
-        Retorna a lista mais recente de redes Wi-Fi detectadas pelo dispositivo.  
-        O dispositivo executa varreduras automáticas periodicamente (a cada 30 segundos), mantendo a lista atualizada em cache.
+        Retorna a lista mais recente de redes Wi-Fi armazenadas em cache pelo dispositivo.  
+
+        **Funcionamento da varredura:**
+        * Cada chamada a este endpoint aciona uma nova varredura em segundo plano para atualizar o cache que será entregue na requisição seguinte.
+        * Uma varredura automática também é executada sempre que um cliente se conecta diretamente ao Access Point (AP) do dispositivo.
       security:
         - bearerAuth: []
       responses:
@@ -339,21 +384,87 @@ paths:
                         security: "WPA3"
                         channel: 11
 
-  /network/wifi/scan:
-    post:
+  /system:
+    get:
       tags:
-        - Rede
-      summary: Scan Wi-Fi
+        - Sistema
+      summary: Informações do Sistema
       description: |
-        Solicita ao dispositivo que execute imediatamente uma nova varredura Wi-Fi, atualizando o cache de redes observadas.  
-
-        > 🕒 A operação é assíncrona: a lista pode levar alguns segundos para refletir as novas redes detectadas.  
-        > Use `GET /network/wifi` para verificar quando o cache for atualizado.
+        Retorna informações gerais sobre o sistema do dispositivo, incluindo versão de firmware, modelo, número de série e tempo de atividade.
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Varredura iniciada com sucesso.
+          description: Sucesso ao obter informações do sistema.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hostname:
+                    type: string
+                    description: Nome do dispositivo.
+                    example: "BriseII"
+                  manufacture_date:
+                    type: string
+                    format: date-time
+                    description: Data de Fabricação do equipamento.
+                    example: "2024-01-15T00:00:00Z"
+                  model:
+                    type: string
+                    description: Modelo do equipamento.
+                    example: "BriseII"
+                  serial_number:
+                    type: string
+                    description: Número de Série do equipamento.
+                    example: "200000"
+                  uptime:
+                    type: integer
+                    description: Tempo de Atividade em segundos.
+                    example: 86400
+                  firmware_name:
+                    type: string
+                    description: Nome do firmware rodando.
+                    example: "briseii"
+                  firmware_version:
+                    type: string
+                    description: Versão do firmware rodando.
+                    example: "v3.1.2"
+                  auto_update:
+                    type: boolean
+                    description: Indica se a atualização automática de firmware está ativada.
+                    example: true
+        "500":
+          description: Erro interno ao obter informações do sistema.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /system/update:
+    post:
+      tags:
+        - Sistema
+      summary: Atualização Upload 🔑🚩Adicionado
+      description: |
+        Envia o arquivo binário contendo o firmware a ser instalado no dispositivo.  
+        Após o recebimento bem-sucedido, o arquivo terá sua integridade verificada, a atualização será aplicada e o dispositivo reiniciará automaticamente.
+
+        > ⚠️ **Privado**: Este endpoint é de uso interno e não deve ser divulgado na documentação pública.
+      x-internal: true
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Arquivo binário de firmware (.bin)
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Upload concluído. O dispositivo iniciará a atualização e reiniciará em breve.
           content:
             application/json:
               schema:
@@ -361,35 +472,1336 @@ paths:
                 properties:
                   success:
                     type: boolean
-                    description: Indica se a solicitação foi aceita.
                     example: true
-                  started_at:
+                  message:
                     type: string
-                    format: date-time
-                    description: Data e hora de início da varredura (UTC).
-                    example: "2025-10-31T10:21:00Z"
-              examples:
-                sucesso:
-                  summary: Exemplo de sucesso
-                  value:
-                    success: true
-                    started_at: "2025-10-31T10:21:00Z"
-        "409":
-          description: Já existe uma varredura em andamento.
+                    example: "Firmware recebido. Reiniciando para atualização..."
+        "400":
+          description: Arquivo inválido ou corrompido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro interno durante o processo de atualização.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /system/update_url:
+    post:
+      tags:
+        - Sistema
+      summary: Atualização Download 🔑🚩Adicionado
+      description: |
+        Envia-se a URL de um servidor remoto que contém o arquivo binário de firmware.  
+        O dispositivo fará o download do arquivo, verificará sua integridade, aplicará a atualização e reiniciará automaticamente.
+
+        > ⚠️ **Privado**: Este endpoint é de uso interno e não deve ser divulgado na documentação pública.
+      x-internal: true
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: URL direta para download do arquivo binário (.bin)
+                  example: "https://brise.com.br/fw/v1.0.1_firmware.bin"
+      responses:
+        "200":
+          description: Solicitação de download aceita. O dispositivo iniciará o download e a atualização em breve.
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  error:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
                     type: string
-                    description: Código do erro indicando que uma operação de varredura já está em execução.
-                    example: ALREADY_IN_PROGRESS
+                    example: "Download iniciado. O dispositivo reiniciará após a conclusão."
+        "400":
+          description: URL inválida ou inacessível.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao baixar ou processar a atualização.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /automations:
+    post:
+      tags:
+        - Rotinas
+      summary: Cria, Edita ou Reordena Rotinas 🔑🚩Adicionado
+      description: |
+        Realiza operações sobre rotinas de automação do dispositivo.
+
+        O comportamento depende do tipo de corpo enviado:
+
+        **Objeto único** — executa uma operação pontual sobre uma rotina:
+
+        | Conteúdo do objeto | Operação |
+        |--------------------|----------|
+        | Sem `id` (ou `id` inexistente no dispositivo) | **Cria** nova rotina — o dispositivo atribui um `id` automaticamente |
+        | `id` existente + outros campos | **Atualiza** a rotina correspondente |
+        | `id` + `idx` | **Reordena** — move a rotina para a posição `idx` (0-based) na lista |
+
+        > 🔑 **Privado**: O envio de um array é de uso interno e não deve ser divulgado na documentação pública.
+        > O envio de um array **sobrescreve** todas as rotinas existentes no dispositivo. Use com cautela.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/Routine"
+                - $ref: "#/components/schemas/RoutineReorderRequest"
+                - type: array
+                  description: |
+                    🔑 Uso interno. Substituição completa da lista de rotinas do dispositivo.
+                    Todas as rotinas existentes serão removidas e substituídas pelas do array.
+                  items:
+                    $ref: "#/components/schemas/Routine"
+            examples:
+              criar:
+                summary: Criar nova rotina
+                value:
+                  name: "Turno da Noite"
+                  en: true
+                  ex: false
+                  cond:
+                    op: AND
+                    tr:
+                      - tp: daily
+                        val: 1320
+                  act:
+                    - cmd: AC_SET
+                      pwr: true
+                      md: cool
+                      temp: 22
+                      fan: 2
+              atualizar:
+                summary: Atualizar rotina existente
+                value:
+                  id: "3044d20e-a02c-4a9a-8508-25f92599622e"
+                  name: "Turno da Noite (Atualizado)"
+                  en: false
+              reordenar:
+                summary: Mover rotina para a primeira posição
+                value:
+                  id: "3044d20e-a02c-4a9a-8508-25f92599622e"
+                  idx: 0
+              sincronizar:
+                summary: 🔑 Substituição completa — Uso interno
+                value:
+                  - id: "3044d20e-a02c-4a9a-8508-25f92599622e"
+                    name: "Turno da Noite"
+                    en: true
+                    ex: false
+                    cond:
+                      op: AND
+                      tr:
+                        - tp: daily
+                          val: 1320
+                    act:
+                      - cmd: AC_SET
+                        pwr: true
+                        md: cool
+                        temp: 22
+                        fan: 2
+                  - name: "Modo Econômico"
+                    en: true
+                    ex: false
+                    cond:
+                      op: AND
+                      tr:
+                        - tp: daily
+                          val: 480
+                    act:
+                      - cmd: AC_SET
+                        pwr: true
+                        md: cool
+                        temp: 24
+                        fan: 1
+      responses:
+        "200":
+          description: Operação(ões) executada(s) com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Indica se todas as operações foram processadas com sucesso.
+                    example: true
+        "400":
+          description: Requisição inválida — JSON malformado ou campos obrigatórios ausentes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalido:
+                  value:
+                    error: INVALID_REQUEST
+        "403":
+          description: Token ausente, inválido ou sem permissão suficiente (`manager`/`owner` obrigatório).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                negado:
+                  value:
+                    error: AUTH_ERROR
+        "503":
+          description: O dispositivo está processando outra operação de automação. Tente novamente em instantes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                ocupado:
+                  value:
+                    error: SYSTEM_BUSY
+    get:
+      tags:
+        - Rotinas
+      summary: Lista Rotinas 🚩Adicionado
+      description: |
+        Retorna todas as rotinas configuradas no dispositivo, na ordem em que estão armazenadas.
+
+        > ⚠️ O parâmetro `id` pode ser informado para filtrar uma rotina específica. A resposta **sempre é um array** — com um único elemento quando `id` é fornecido e a rotina existe, ou vazio caso não seja encontrada.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: false
+          description: Identificador da rotina. Quando informado, retorna array com apenas a rotina correspondente.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Lista de rotinas (zero ou mais elementos).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Routine"
+        "403":
+          description: Token de autenticação ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                negado:
+                  value:
+                    error: AUTH_ERROR
+    delete:
+      tags:
+        - Rotinas
+      summary: Remove Rotina(s) 🚩Adicionado
+      description: |
+        Este endpoint permite apagar rotinas de automação do dispositivo. Você pode apagar apenas uma rotina ou várias de uma vez só, dependendo de como envia a requisição.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/RoutineDeleteRequest"
+                - $ref: "#/components/schemas/RoutineDeleteMultipleRequest"
+                - type: array
+                  description: Lista de identificadores únicos (UUID) das rotinas a remover em lote.
+                  items:
+                    type: string
+                    format: uuid
+            examples:
+              unica:
+                summary: Remover uma rotina (objeto com id)
+                value:
+                  id: "3044d20e-a02c-4a9a-8508-25f92599622e"
+              multiplas_obj:
+                summary: Remover múltiplas rotinas (objeto com ids)
+                value:
+                  ids:
+                    - "3044d20e-a02c-4a9a-8508-25f92599622e"
+                    - "7a1b2c3d-4e5f-6789-abcd-ef0123456789"
+              multiplas_array:
+                summary: Remover múltiplas rotinas (array de strings)
+                value:
+                  - "3044d20e-a02c-4a9a-8508-25f92599622e"
+                  - "7a1b2c3d-4e5f-6789-abcd-ef0123456789"
+      responses:
+        "200":
+          description: Rotina(s) removida(s) com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: Requisição inválida — `id` ausente ou formato incorreto.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalido:
+                  value:
+                    error: INVALID_REQUEST
+        "403":
+          description: Token ausente, inválido ou sem permissão suficiente (`manager`/`owner` obrigatório).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                negado:
+                  value:
+                    error: AUTH_ERROR
+        "503":
+          description: O dispositivo está processando outra operação. Tente novamente em instantes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                ocupado:
+                  value:
+                    error: SYSTEM_BUSY
+
+  /access/vouchers:
+    post:
+      tags:
+        - Acesso
+      summary: Compartilha Dispositivo 🚩Adicionado
+      description: |
+        Gera um voucher que pode ser utilizado por outro usuário para obter acesso ao dispositivo.
+
+        O voucher define o papel de acesso concedido e pode incluir informações adicionais para identificar o destinatário e sugerir sua posição na árvore de grupos.
+
+        O voucher deve ser enviado ao destinatário, que deverá utilizá-lo em `POST /access/redeem`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role
+              properties:
+                role:
+                  $ref: "#/components/schemas/AccessRole"
+                uses:
+                  type: integer
+                  format: int32
+                  minimum: 1
+                  default: 1
+                  description: Número de resgates permitidos para este voucher.
+                  example: 1
+                expires_in:
+                  type: integer
+                  format: int32
+                  minimum: 60
+                  maximum: 86400
+                  default: 3600
+                  description: |
+                    Validade pretendida do voucher, em segundos, contados a partir da emissão.
+                  example: 3600
+                grantee_email:
+                  type: string
+                  format: email
+                  description: |
+                    E‑mail do usuário que receberá o acesso. Não tem efeito de autorização.
+                  example: "maria@brise.com.br"
+                path:
+                  type: string
+                  maxLength: 255
+                  description: |
+                    Sugestão, indicada por quem compartilha, de onde o equipamento deve ser posicionado na árvore de grupos do destinatário — caminho de grupos/subgrupos separados por `/` (ex.: `Matriz/Piso 2/Sala de Reuniões`). Viaja assinado dentro do `voucher_code` e é devolvido no resgate; A aplicação do destinatário cria os grupos que faltarem e pode ignorar ou ajustar. Sem efeito de autorização.
+                  example: "Matriz/Piso 2/Sala de Reuniões"
+      responses:
+        "201":
+          description: Compartilhamento (Voucher) criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoucherCreated"
+              examples:
+                sucesso:
+                  summary: Voucher de uso único
+                  value:
+                    expires_at: "2026-09-16T19:54:16"
+                    voucher_code: "eyJlbWwiOiJ0aWFnby5kYXZpbGFAYWdzdC5jb20uYnIiLCJleHAiOjE3ODk1ODg0NTYsImp0aSI6ImNiOGZhNzgwLTUyOGMtNDAxMi04Y2U1LTEyMThhODBlMWFkNCIsInB0aCI6IkFHU1QiLCJyb2xlIjoib3BlcmF0b3IiLCJzcmwiOjIwMDAwMSwidXNlcyI6MX0=.0rWrte0VnCtW6URvF/7/ExM5e1AV5z7A2w+MBVZiX+A="
+                    voucher_id: "cb8fa780-528c-4012-8ce5-1218a80e1ad4"
+        "400":
+          description: Parâmetros inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: |
+            O usuário não possui privilégio para compartilhar o dispositivo, ou tentou conceder um papel superior ao próprio.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                negado:
+                  value:
+                    error: ACCESS_DENIED
+        "429":
+          description: Limite de vouchers pendentes atingido. Remova ou aguarde a expiração de vouchers anteriores.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Falha ao persistir o voucher na memória não volátil.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                falha_nvs:
+                  value:
+                    error: NVS_WRITE_ERROR
+        "503":
+          description: |
+            O dispositivo não possui um relógio válido e não está apto a emitir vouchers com prazo de validade.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                relogio_invalido:
+                  value:
+                    error: CLOCK_UNAVAILABLE
+    get:
+      tags:
+        - Acesso
+      summary: Lista Convites 🚩Adicionado
+      description: |
+        Retorna os vouchers de acesso emitidos para o dispositivo que ainda estão disponíveis para resgate.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lista de vouchers pendentes.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vouchers:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Voucher"
+              examples:
+                exemplo:
+                  value:
+                    vouchers:
+                      - expires_at: "2026-09-16T19:27:51"
+                        uses_remaining: 1
+                        voucher_id: "ed65b236-0fda-4bf5-a1b4-1a19cff4d443"
+        "401":
+          description: Token de acesso ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: O usuário não possui permissão para listar convites.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags:
+        - Acesso
+      summary: Cancela Convite 🚩Adicionado
+      description: |
+        Revoga (cancela) um voucher pendente emitido para o dispositivo, tornando-o inválido para qualquer resgate futuro.
+
+        Somente usuários com papel `manager` ou `owner` podem revogar vouchers emitidos pelo dispositivo.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: voucher_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Identificador único do voucher a ser revogado.
+          example: "b3c1f5a0-2e77-4a1b-9c3d-8f0e1a2b3c4d"
+      responses:
+        "200":
+          description: Voucher revogado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Indica se o voucher foi revogado com sucesso.
+                    example: true
+        "400":
+          description: Requisição inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token de acesso ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: O usuário não tem permissão para cancelar o convite.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                negado:
+                  value:
+                    error: ACCESS_DENIED
+        "404":
+          description: Voucher não encontrado — pode ter expirado, já sido revogado ou nunca ter sido emitido por este dispositivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                inexistente:
+                  value:
+                    error: VOUCHER_NOT_FOUND
+
+  /access/redeem:
+    post:
+      tags:
+        - Acesso
+      summary: Aceita Compartilhamento 🚩Adicionado
+      description: |
+        Resgata um voucher válido e obtém um Access Token para acesso ao dispositivo.
+
+        Este endpoint não exige autenticação prévia. O `voucher_code` é utilizado para validar a autorização do resgate.
+
+        O Access Token retornado deve ser utilizado nas requisições autenticadas subsequentes.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - voucher_code
+                - subject_id
+              properties:
+                voucher_code:
+                  type: string
+                  description: Valor recebido em `voucher_code` na emissão do voucher.
+                  example: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9..."
+                subject_id:
+                  type: string
+                  format: uuid
+                  description: |
+                    Identificador UUID de quem está resgatando.
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        "200":
+          description: |
+            Convite aceito com sucesso. O `access_token` deve ser enviado no cabeçalho `Authorization` das requisições autenticadas subsequentes.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - access_token
+                properties:
+                  access_token:
+                    type: string
+                    description: Access Token de acesso ao dispositivo.
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              examples:
+                sucesso:
+                  summary: Exemplo de sucesso
+                  value:
+                    access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        "400":
+          description: Requisição malformada (campos obrigatórios ausentes).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Voucher já resgatado o número máximo de vezes ou removido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                consumido:
+                  value:
+                    error: VOUCHER_ALREADY_REDEEMED
+        "410":
+          description: Voucher expirado (o prazo em `expires_at` — TTL de 3600 s no firmware atual — já passou).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                expirado:
+                  value:
+                    error: VOUCHER_EXPIRED
+        "503":
+          description: |
+            O dispositivo não possui um relógio válido e não está apto a resgatar vouchers com prazo de validade.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                relogio_invalido:
+                  value:
+                    error: CLOCK_UNAVAILABLE
+  
+  /access/token:
+    delete:
+      tags:
+        - Acesso
+      summary: Revoga Acesso 🚩Adicionado
+      description: |
+        Revoga o acesso de um usuário ao dispositivo.
+
+        O `subject_id` corresponde ao identificador do usuário, o UUID gerado em Modo LAN ou o `user_id` da Cloud, registrado no claim `sub` do Access Token no momento do resgate (`POST /access/redeem`).
+
+        Somente usuários com papel `manager` ou `owner` podem revogar o acesso de outros usuários.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: subject_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: |
+            Identificador único do usuário cujo acesso ao dispositivo será revogado. Corresponde ao claim `sub` do Access Token registrado no resgate (`POST /access/redeem`).
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        "200":
+          description: Acesso revogado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Indica se o acesso foi revogado com sucesso.
+                    example: true
+        "400":
+          description: Requisição inválida. Verifique se o `subject_id` foi informado corretamente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token de autenticação ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: O usuário autenticado não possui permissão para revogar o acesso informado (`manager`/`owner` obrigatório).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                negado:
+                  value:
+                    error: ACCESS_DENIED
+        "404":
+          description: Usuário não encontrado — o `subject_id` informado não possui acesso ativo neste dispositivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                inexistente:
+                  value:
+                    error: USER_NOT_FOUND
+
+  /logs/events:
+    get:
+      tags:
+        - Logs
+      summary: Lista Eventos 🚩Adicionado
+      description: |
+        Retorna o histórico de eventos e ações executadas pelo ou através do dispositivo.
+        
+        > 💡 Sem parâmetros de filtro, a requisição retorna por padrão o histórico total do dispositivo.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Quantidade máxima de registros a retornar. O limite físico do dispositivo é tipicamente 100.
+          schema:
+            type: integer
+            default: 100
+        - name: since
+          in: query
+          required: false
+          description: Filtra registros gerados a partir deste timestamp UTC.
+          schema:
+            type: integer
+        - name: until
+          in: query
+          required: false
+          description: Filtra registros gerados até este timestamp UTC.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista de eventos registrados (Array de objetos EventLog).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventLog"
+        "401":
+          description: Token de autenticação ausente ou inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: O usuário autenticado não possui permissão para acessar os logs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /device:
+    get:
+      tags:
+        - Dispositivo
+      summary: Dispositivo 🚩Adicionado
+      description: |
+        Retorna um resumo do dispositivo, com o nível de detalhe escolhido pelo parâmetro `fields`.
+
+      operationId: getDeviceOverview
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: fields
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all]
+          description: |
+            Se omitido, retorna o resumo mínimo de "ping". `all` retorna o estado completo do dispositivo.
+      responses:
+        "200":
+          description: |
+            Resumo mínimo (padrão, sem `fields`) ou o estado completo (`fields=all`).
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/DevicePing"
+                  - $ref: "#/components/schemas/DeviceStateAll"
+              examples:
+                ping:
+                  summary: Resumo mínimo (padrão, sem `fields`)
+                  value:
+                    power: true
+                    temp: 24.5
+                all:
+                  summary: fields=all
+                  value:
+                    ac:
+                      power: true
+                      setpoint: 22
+                      fan: 0
+                      mode: 1
+                      sw_v: true
+                      sw: true
+                      fast: false
+                      sleep: false
+                    sensors:
+                      temp: 24.5
+                      temp_max: 29.0
+                      temp_min: 18.5
+                      temp_avg: 23.2
+                      presence: true
+                      presence_du: 1800
+                      machine_st: true
+                    config:
+                      absence_shutdown: false
+                      absence_timeout: 1800
+                      anonymous_control: false
+                      auto_clean: false
+                      ir_jammer: false
+                      light_comfort: false
+                      temp_limit: false
+                      temp_limit_min_value: 20
+                      temp_limit_max_value: 26
+                      presence_resume: false
+                      presence_timeout: 600
+                      resilient_mode: false
+                    status:
+                      receiver: false
+                      autoCleanTimer: 0
+                      autoCleanTotalTime: 0
+                      autoCleanRunning: 0
+        "403":
+          description: O usuário autenticado não possui permissão para acessar o dispositivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /control:
+    get:
+      tags:
+        - Dispositivo
+      summary: Estado do AC 🚩Adicionado
+      description: |
+        Retorna o estado configurado do Ar Condicionado.
+
+      operationId: getACControl
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Estado do AC.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ACControl"
+              example:
+                power: true
+                setpoint: 22
+                fan: 0
+                mode: 1
+                sw_v: true
+                sw: true
+                fast: false
+                sleep: false
+                unknown: false
+        "403":
+          description: O usuário autenticado não possui permissão para acessar o dispositivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags:
+        - Dispositivo
+      summary: Alterar AC 🚩Adicionado
+      description: |
+        Altera as configurações do ar condicionado.
+        O envio de cada chave é opcional. Se a chave não for enviada, o estado correspondente não será alterado.
+      operationId: updateACControl
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ACControl"
+            examples:
+              ligar_modo_cool:
+                summary: Ligar no modo Frio, ventilação máxima, 20°C
+                value:
+                  power: true
+                  setpoint: 20
+                  fan: 3
+                  mode: 1
+              apenas_desligar:
+                summary: Desligar o ar condicionado
+                value:
+                  power: false
+      responses:
+        "200":
+          description: Comando recebido e processado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: Requisição inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Acesso negado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sensors:
+    get:
+      tags:
+        - Dispositivo
+      summary: Sensores 🚩Adicionado
+      description: Retorna as leituras dos sensores.
+      operationId: getDeviceSensors
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Leitura atual dos sensores.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ACSensors"
+              example:
+                temp: 24.5
+                temp_max: 29.0
+                temp_min: 18.5
+                temp_avg: 23.2
+                presence: true
+                presence_du: 1800
+                machine_st: true
+        "403":
+          description: O usuário autenticado não possui permissão para acessar.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /config:
+    get:
+      tags:
+        - Dispositivo
+      summary: Configurações 🚩Adicionado
+      description: Retorna as configurações atuais do dispositivo em relação as funções extras.
+      operationId: getDeviceConfig
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Configurações atuais.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceConfig"
+        "403":
+          description: O usuário autenticado não possui permissão para acessar as configurações.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags:
+        - Dispositivo
+      summary: Configurações 🚩Adicionado
+      description: |
+        Altera as configurações do dispositivo.
+        O envio de cada chave é opcional. Se a chave não for enviada, o valor correspondente não será alterado.
+      operationId: updateDeviceConfig
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceConfig"
+      responses:
+        "200":
+          description: Comando recebido e processado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: Requisição inválida.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Acesso negado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /config/status:
+    get:
+      tags:
+        - Dispositivo
+      summary: Estado de Configurações 🚩Adicionado
+      description: |
+        Retorna dados de estado derivados das configurações do dispositivo. Estes dados refletem processos internos em andamento.
+      operationId: getDeviceConfigStatus
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Estado atual das configurações.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceConfigStatus"
+        "403":
+          description: O usuário autenticado não possui permissão para acessar.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /protocol:
+    get:
+      tags:
+        - Protocolo IR
+      summary: Protocolo IR 🚩Adicionado
+      description: |
+        Retorna o protocolo infravermelho atualmente armazenado na memória não volátil do dispositivo.
+
+        O protocolo inclui os **timings** de pulso e o **dicionário de comandos** utilizados para controlar a máquina de Ar Condicionado.
+      operationId: getIRProtocol
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Protocolo IR armazenado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IRProtocol"
+              examples:
+                midea:
+                  summary: Protocolo Midea (parcial)
+                  value:
+                    id: 111
+                    brand: "Midea_PeD"
+                    maxlen: 20
+                    timings:
+                      "0": "01CB8269"
+                      "1": "05FE8269"
+                      H: "10DF917C"
+                      F: "0000826C"
+                      G: "1406826C"
+                    commands:
+                      "848": "Af4wsk17hOAfAgH+MLJNe4TgHwM="
+                      "8736": "Af4wsk2fYBDvAgH+MLJNn2AQ7wM="
+                      "8752": "Af4wsk1foBDvAgH+MLJNX6AQ7wM="
+        "403":
+          description: O usuário autenticado não possui permissão.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                negado:
+                  value:
+                    error: ACCESS_DENIED
+        "404":
+          description: Nenhum protocolo IR configurado no dispositivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                sem_protocolo:
+                  value:
+                    error: PROTOCOL_NOT_FOUND
+
+    post:
+      tags:
+        - Protocolo IR
+      summary: Protocolo IR 🚩Adicionado
+      description: |
+        Grava o protocolo infravermelho na memória não volátil do dispositivo.
+
+        Aceita dois modos de operação:
+
+        - **Protocolo completo**: envie o objeto com `id`, `brand`, `maxlen`, `timings` e `commands`. Substitui integralmente o protocolo armazenado.
+        - **Atualização parcial de comandos**: envie apenas `commands`. Os timings existentes são mantidos e apenas os comandos informados são adicionados/substituídos.
+
+        ### Formato dos Timings
+
+        Cada entrada do objeto `timings` mapeia um token de símbolo IR para uma string hexadecimal que codifica o par `(mark, space)` em unidades de clock do periférico RMT:
+
+        - **Normal** (8 hex chars): `SSSSMMM` onde `MMMM` = mark com bit 15 em 1 (`0x8000 | mark`), `SSSS` = space.
+        - **Mega** (12 hex chars, para gaps longos ≥ 32768 µs): `0000MMMMHHHH LLLL` — mark com MSW e LSW do space separados.
+
+        ### Formato dos Comandos
+
+        Cada entrada de `commands` mapeia um ID numérico (como string decimal) para um bytecode Base64 que codifica a sequência de símbolos IR:
+
+        | Byte | Significado |
+        |---|---|
+        | `0x01` | Header (`H`) |
+        | `0x02` | Gap (`G`) |
+        | `0x03` | Footer (`F`) |
+        | `0xFE` + N + bytes | N bits de dados (big-endian, empacotados) |
+        | `0x04`–`0x0E` | Símbolo extra (`4`–`9`, `A`–`E`) |
+
+        ### ID de Comando
+
+        O ID numérico codifica o estado completo da máquina usando a fórmula: |  
+        id = (power × 7680) + ((temp − 16) × 480) + (mode × 80) + (fan × 16) + (swingV × 8) + (swingH × 4) + (sleep × 2) + fast
+      operationId: postIRProtocol
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IRProtocol"
+            examples:
+              completo:
+                summary: Upload de protocolo completo
+                value:
+                  id: 111
+                  brand: "Midea_PeD"
+                  maxlen: 20
+                  timings:
+                    "0": "01CB8269"
+                    "1": "05FE8269"
+                    H: "10DF917C"
+                    F: "0000826C"
+                    G: "1406826C"
+                  commands:
+                    "848": "Af4wsk17hOAfAgH+MLJNe4TgHwM="
+                    "8736": "Af4wsk2fYBDvAgH+MLJNn2AQ7wM="
+              parcial:
+                summary: Atualização parcial (apenas um comando)
+                value:
+                  commands:
+                    "848": "Af4wsk17hOAfAgH+MLJNe4TgHwM="
+      responses:
+        "200":
+          description: Protocolo gravado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: Payload inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Acesso negado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Falha ao gravar o protocolo na memória não volátil.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                falha_nvs:
+                  value:
+                    error: NVS_WRITE_ERROR
+
+  /protocol/cmd:
+    get:
+      tags:
+        - Protocolo IR
+      summary: Capturar IR 🚩Adicionado
+      description: |
+        Lê o último frame infravermelho capturado pelo sensor do dispositivo.
+
+        Utilizado durante o processo de aprendizado de protocolo: o usuário aponta o controle remoto físico para o dispositivo e pressiona um botão; em seguida chama este endpoint para obter o sinal capturado.
+
+        O parâmetro `type` seleciona o formato da resposta:
+        - **`bs`** (padrão): stream RMT bruto codificado em Base64. Representa uma sequência de itens RMT (4 bytes cada, big-endian):
+          - Bits 0–14: duração do pulso (mark) em ticks do periférico RMT.
+          - Bits 16–30: duração do espaço (space).
+          - Space = 0 indica formato mega (gap longo), com o próximo item contendo o espaço real em 31 bits.
+        - **`raw`**: payload já decodificado, em hexadecimal — mesmo formato da coluna `payload_raw` da base de protocolos, pronto para busca por igualdade.
+        - **`b64`**: payload já decodificado, em Base64 — mesmo formato da coluna `payload_b64` da base de protocolos (mais econômico em banda que `raw`, ao custo de processamento no dispositivo).
+      operationId: captureIRCmd
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [bs, raw, b64]
+            default: bs
+          description: Formato da resposta desejado.
+      responses:
+        "200":
+          description: Frame IR capturado com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IRCapturedCommand"
+              examples:
+                bruto:
+                  summary: "type=bs (padrão)"
+                  value:
+                    bs: "EQBJ/xEASf8RAEn/EQBJABEASf8="
+                decodificado_hex:
+                  summary: type=raw
+                  value:
+                    payload_raw: "0100AB01FE08D500"
+                decodificado_b64:
+                  summary: type=b64
+                  value:
+                    payload_b64: "AQCrAf4I1QA="
+        "400":
+          description: Valor de `type` inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                tipo_invalido:
+                  value:
+                    error: INVALID_TYPE
+        "403":
+          description: O usuário autenticado não possui permissão.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                negado:
+                  value:
+                    error: ACCESS_DENIED
+        "404":
+          description: Nenhum sinal IR disponível.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                sem_sinal:
+                  value:
+                    error: PROTOCOL_NOT_FOUND
+        "422":
+          description: O sinal capturado não pôde ser decodificado com confiança (por exemplo, ruído ou menos de 2 candidatos a bit de dados). Só ocorre com `type=raw` ou `type=b64`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                falha_decode:
+                  value:
+                    error: DECODE_FAILED
+
+    post:
+      tags:
+        - Protocolo IR
+      summary: Reproduzir IR 🚩Adicionado
+      description: |
+        Emite um frame infravermelho arbitrário pelo emissor do dispositivo.
+
+        Utilizado para verificação e teste durante o processo de aprendizado de protocolo: o usuário envia o sinal capturado de volta ao dispositivo para confirmar que o AC responde corretamente.
+
+        O campo `bs` deve conter o mesmo formato de stream RMT retornado por `GET /protocol/cmd` (`type=bs`, padrão).
+      operationId: playIRCmd
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IRRawFrame"
+            examples:
+              frame:
+                value:
+                  bs: "EQBJ/xEASf8RAEn/EQBJABEASf8="
+      responses:
+        "200":
+          description: Frame IR emitido com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: Payload inválido — `bs` ausente ou não é Base64 válido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Acesso negado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   securitySchemes:
     bearerAuth:
-      title: Bearer Authentication
       type: http
       scheme: bearer
       description: |
@@ -406,3 +1818,535 @@ components:
           type: string
           description: Código de erro representando o tipo de falha da requisição.
           example: INVALID_REQUEST
+
+
+    DeviceConfig:
+      type: object
+      description: |
+        Configurações do dispositivo.
+        Estas configurações dizem respeito a funções extras do dispositivo que persistem na memória (não são perdidas ao reiniciar o dispositivo), diferentemente das configurações de controle do Ar Condicionado.
+      properties:
+        absence_shutdown:
+          type: boolean
+          description: "Habilita ou desabilita o desligamento automático por ausência (true: habilitado, false: desabilitado)"
+          example: false
+        absence_timeout:
+          type: integer
+          description: "Tempo em minutos que o ambiente deve permanecer vazio antes do desligamento automático"
+          example: 1800
+        anonymous_control:
+          type: boolean
+          description: "Habilita a possibilidade de controlar o AC sem autenticação (true: habilitado, false: desabilitado)"
+          example: false
+        auto_clean:
+          type: boolean
+          description: "Habilita ou desabilita a funcionalidade de limpeza automática (true: habilitado, false: desabilitado)"
+          example: false
+        ir_jammer:
+          type: boolean
+          description: "Emite um sinal de interferência quando detecta um comando de infravermelho (true: habilitado, false: desabilitado)"
+          example: false
+        light_comfort:
+          type: boolean
+          description: "Desliga o LED de estado para não incomodar em ambientes escuros (true: habilitado, false: desabilitado)"
+          example: false
+        temp_limit:
+          type: boolean
+          description: "Habilita o limite para o setpoint ser configurado (true: habilitado, false: desabilitado)"
+          example: false
+        temp_limit_min_value:
+          type: integer
+          description: "Estabelece o limite mínimo para o setpoint (°C)"
+          example: 20
+        temp_limit_max_value:
+          type: integer
+          description: "Estabelece um limite máximo para o setpoint (°C)"
+          example: 26
+        presence_resume:
+          type: boolean
+          description: "Habilita ou desabilita o religamento automático por presença (true: habilitado, false: desabilitado)"
+          example: false
+        presence_timeout:
+          type: integer
+          description: "Tempo em minutos que a presença deve permanecer contínua antes do religamento automático"
+          example: 600
+        resilient_mode:
+          type: boolean
+          description: "Mantém o equipamento sincronizado com o estado definido pelo sistema de automação (true: habilitado, false: desabilitado)"
+          example: false
+
+    DeviceConfigStatus:
+      type: object
+      description: |
+        Estado derivado das configurações do dispositivo, atualizado em tempo real.
+        Estes dados refletem processos internos em andamento e devem ser consultados com frequência para compor o dashboard.
+      properties:
+        receiver:
+          type: boolean
+          description: "Sensor de receptor e emissor infravermelho ativo no momento (true: externo, false: interno)"
+          example: false
+        autoCleanTimer:
+          type: integer
+          description: "Tempo restante do ciclo de Limpeza Automática em execução, em segundos. Zero se não há ciclo ativo."
+          example: 1212
+        autoCleanTotalTime:
+          type: integer
+          description: "Tempo decorrido do ciclo de limpeza atual, em segundos."
+          example: 2323
+        autoCleanRunning:
+          type: integer
+          description: "Tempo total previsto para o ciclo de limpeza, em segundos."
+          example: 23
+
+    ACControl:
+      type: object
+      description: Representa o estado configurado do Ar Condicionado.
+      properties:
+        power:
+          type: boolean
+          description: "true: Ligar, false: Desligar (Se ausente, mantém o estado atual)"
+          example: true
+        setpoint:
+          type: integer
+          description: "Temperatura desejada (°C)"
+          example: 22
+        fan:
+          type: integer
+          description: "Velocidade do ventilador (0: auto, 1: low, 2: med, 3: high, 4: max)"
+          enum: [0, 1, 2, 3, 4]
+          example: 0
+        mode:
+          type: integer
+          description: "Modo de operação (0: auto, 1: cool, 2: dry, 3: heat, 4: fan)"
+          enum: [0, 1, 2, 3, 4]
+          example: 1
+        sw_v:
+          type: boolean
+          description: "Estado do defletor vertical (true: ativado, false: desativado)"
+          example: true
+        sw:
+          type: boolean
+          description: "Estado do defletor horizontal (true: ativado, false: desativado)"
+          example: true
+        fast:
+          type: boolean
+          description: "Modo de resfriamento/aquecimento rápido (fast) (true: ativado, false: desativado)"
+          example: true
+        sleep:
+          type: boolean
+          description: "Modo noturno (sleep) (true: ativado, false: desativado)"
+          example: true
+        findme:
+          type: boolean
+          description: "Sinal luminoso para identificar o dispositivo (true: reproduzir padrão luminoso)"
+          writeOnly: true
+          example: true
+        unknown:
+          type: boolean
+          description: "Comando Infravermelho desconhecido"
+          readOnly: true
+          example: true
+
+    ACSensors:
+      type: object
+      description: Leitura dos sensores do ambiente.
+      properties:
+        temp:
+          type: number
+          description: "Temperatura ambiente atual aferida (°C)"
+          example: 24.5
+        temp_max:
+          type: number
+          description: "Temperatura máxima do dia (°C)"
+          example: 29.0
+        temp_min:
+          type: number
+          description: "Temperatura mínima do dia (°C)"
+          example: 18.5
+        temp_avg:
+          type: number
+          description: "Temperatura média do dia (°C)"
+          example: 23.2
+        presence:
+          type: boolean
+          description: "Indica se há detecção de pessoas no ambiente (true) ou se não há (false)"
+          example: true
+        presence_du:
+          type: integer
+          description: "Tempo em segundos no estado atual de presença (com ou sem pessoas)"
+          example: 1800
+        machine_st:
+          type: boolean
+          description: "Confirmação por sensor de que a máquina realmente encontra-se ligada (true) ou desligada (false)"
+          example: true
+
+    DevicePing:
+      type: object
+      description: |
+        Resumo mínimo do dispositivo, retornado por padrão em `GET /device` (sem `fields`). O
+        próprio HTTP 200 já confirma que o dispositivo respondeu (está alcançável); estes dois
+        campos bastam para saber se a máquina está ligada e a temperatura ambiente, sem o custo de
+        uma leitura completa — pensado para varreduras frequentes, especialmente em grupos com
+        muitos dispositivos.
+      properties:
+        power:
+          type: boolean
+          description: "Estado de ligado/desligado do Ar Condicionado (ver ACControl.power)"
+          example: true
+        temp:
+          type: number
+          description: "Temperatura ambiente atual aferida (°C) (ver ACSensors.temp)"
+          example: 24.5
+
+    DeviceStateAll:
+      type: object
+      description: |
+        Resposta completa retornada por `GET /device?fields=all`. Inclui o estado do AC, sensores,
+        configurações do dispositivo e o estado em tempo real derivado delas (`status`).
+      properties:
+        ac:
+          $ref: "#/components/schemas/ACControl"
+        sensors:
+          $ref: "#/components/schemas/ACSensors"
+        config:
+          $ref: "#/components/schemas/DeviceConfig"
+        status:
+          $ref: "#/components/schemas/DeviceConfigStatus"
+
+    EventLog:
+      type: object
+      description: Registro de evento de auditoria ou ação do dispositivo.
+      properties:
+        ts:
+          type: integer
+          description: Timestamp UTC de quando o evento ocorreu.
+          example: 1718293456
+        uts:
+          type: boolean
+          description: Untrusted Timestamp. Se `true`, indica que o relógio do dispositivo não estava sincronizado e não era confiável no momento do evento.
+          example: false
+        by:
+          type: string
+          description: Identificador de quem gerou o evento (usuário, automação, ou sistema).
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        code:
+          type: integer
+          description: Código identificador numérico do tipo de evento.
+          example: 105
+        args:
+          type: array
+          description: Lista de argumentos dinâmicos associados a este tipo de evento.
+          items:
+            type: string
+          example: ["22", "cool", "1"]
+        sync:
+          type: boolean
+          description: Se `true`, indica que este registro já foi sincronizado com a plataforma Cloud.
+          example: true
+
+    Routine:
+      type: object
+      description: Definição completa de uma rotina de automação.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: |
+            Identificador único da rotina.  
+            Quando omitido em uma criação, o dispositivo atribui automaticamente um novo identificador.
+          example: "3044d20e-a02c-4a9a-8508-25f92599622e"
+
+        name:
+          type: string
+          description: Nome amigável da rotina.
+          example: "Turno da Noite"
+
+        en:
+          type: boolean
+          description: Define se a rotina está habilitada (enabled).
+          example: true
+
+        ex:
+          type: boolean
+          description: |
+            Quando verdadeiro, impede que outras rotinas sejam executadas simultaneamente (exclusive).
+          example: false
+
+        cond:
+          $ref: "#/components/schemas/RoutineConditions"
+
+        act:
+          type: array
+          description: Lista de ações executadas quando as condições forem satisfeitas.
+          items:
+            $ref: "#/components/schemas/RoutineAction"
+
+    RoutineConditions:
+      type: object
+      description: Conjunto de condições necessárias para execução da rotina.
+      properties:
+        op:
+          type: string
+          description: Operador lógico utilizado para combinar os gatilhos.
+          enum:
+            - AND
+            - OR
+
+        tr:
+          type: array
+          description: Lista de gatilhos avaliados pela rotina.
+          items:
+            $ref: "#/components/schemas/RoutineTrigger"
+
+    RoutineTrigger:
+      type: object
+      description: Gatilho que compõe a condição da rotina.
+      properties:
+        tp:
+          type: string
+          description: Tipo do gatilho.
+          example: "boot"
+        val:
+          type: integer
+          description: Valor associado ao gatilho.
+          example: 0
+
+    RoutineAction:
+      type: object
+      description: |
+        Ação executada quando a condição da rotina for satisfeita.
+        Os campos específicos dependem do comando informado em `cmd`.
+      properties:
+        cmd:
+          type: string
+          description: Comando a ser executado.
+          example: "AC_SET"
+        fan:
+          type: integer
+          description: Velocidade do ventilador.
+          example: 1
+        md:
+          type: string
+          description: Modo de operação.
+          example: "cool"
+        pwr:
+          type: boolean
+          description: Estado da alimentação (ligado/desligado).
+          example: false
+        temp:
+          type: integer
+          description: Temperatura alvo.
+          example: 18
+
+    RoutineDeleteRequest:
+      type: object
+      description: Solicitação de remoção de uma rotina pelo identificador.
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador único da rotina a ser removida.
+          example: "3044d20e-a02c-4a9a-8508-25f92599622e"
+
+    RoutineDeleteMultipleRequest:
+      type: object
+      description: Solicitação de remoção de múltiplas rotinas pelos identificadores.
+      required:
+        - ids
+      properties:
+        ids:
+          type: array
+          description: Lista de identificadores únicos das rotinas a serem removidas.
+          items:
+            type: string
+            format: uuid
+          example:
+            - "3044d20e-a02c-4a9a-8508-25f92599622e"
+            - "7a1b2c3d-4e5f-6789-abcd-ef0123456789"
+
+    RoutineReorderRequest:
+      type: object
+      description: |
+        Solicitação de reordenação de uma rotina na lista.  
+        O dispositivo move a rotina identificada por `id` para a posição `idx`, deslocando as demais.
+      required:
+        - id
+        - idx
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador único da rotina a ser reordenada.
+          example: "3044d20e-a02c-4a9a-8508-25f92599622e"
+        idx:
+          type: integer
+          minimum: 0
+          description: |
+            Índice de destino (0-based) para onde a rotina deve ser movida na lista.  
+            Por exemplo, `idx: 0` move a rotina para o início da lista.
+          example: 0
+
+    AccessRole:
+      type: string
+      enum:
+        - viewer
+        - operator
+        - manager
+      description: |
+        Papel associado a um acesso ao dispositivo, em ordem crescente de privilégio:
+        - `viewer`: leitura de estado e telemetria.
+        - `operator`: `viewer` + envio de comandos de controle.
+        - `manager`: `operator` + rotinas, configuração e geração de vouchers.
+
+        O papel `owner`, obtido no provisionamento (`POST /network/wifi`), acumula todos os privilégios de `manager` mais a gestão de acessos; não pode ser concedido por voucher.
+      example: operator
+
+    Voucher:
+      type: object
+      description: |
+        Voucher de acesso pendente.
+      required:
+        - voucher_id
+        - uses_remaining
+      properties:
+        expires_at:
+          type: string
+          description: Instante em que o voucher deixa de ser válido.
+          example: "2026-09-16T19:27:51"
+        uses_remaining:
+          type: integer
+          format: int32
+          description: Resgates ainda disponíveis para este voucher.
+          example: 1
+        voucher_id:
+          type: string
+          format: uuid
+          description: Identificador do voucher.
+          example: "ed65b236-0fda-4bf5-a1b4-1a19cff4d443"
+
+    VoucherCreated:
+      type: object
+      description: |
+        Voucher recém-criado.
+      required:
+        - expires_at
+        - voucher_code
+        - voucher_id
+      properties:
+        expires_at:
+          type: string
+          description: Data/hora de expiração do voucher (ISO 8601).
+          example: "2026-09-16T19:54:16"
+        voucher_code:
+          type: string
+          description: Artefato assinado transmitido ao destinatário e apresentado no resgate.
+          example: "eyJlbWwiOiJ0aWFnby5kYXZpbGFAYWdzdC5jb20uYnIiLCJleHAiOjE3ODk1ODg0NTYsImp0aSI6ImNiOGZhNzgwLTUyOGMtNDAxMi04Y2U1LTEyMThhODBlMWFkNCIsInB0aCI6IkFHU1QiLCJyb2xlIjoib3BlcmF0b3IiLCJzcmwiOjIwMDAwMSwidXNlcyI6MX0=.0rWrte0VnCtW6URvF/7/ExM5e1AV5z7A2w+MBVZiX+A="
+        voucher_id:
+          type: string
+          format: uuid
+          description: Identificador único do voucher gerado.
+          example: "cb8fa780-528c-4012-8ce5-1218a80e1ad4"
+
+    IRTimings:
+      type: object
+      description: |
+        Dicionário de timings do protocolo IR. Cada chave é um token de símbolo (ex.: `"0"`, `"1"`, `"H"`, `"F"`, `"G"`, `"4"`…`"E"`) e o valor é uma string hexadecimal que codifica o par `(mark, space)` em ticks do periférico RMT do ESP32.
+
+        **Formato normal** (8 hex chars): `SSSSMMM` onde `MMMM` = mark com bit 15 em 1 (`0x8000 | mark`), `SSSS` = space.
+
+        **Formato mega** (12 hex chars, para gaps longos ≥ 32.768 µs): `0000MMMM` + MSW(space) + LSW(space).
+      additionalProperties:
+        type: string
+        pattern: '^([0-9A-Fa-f]{8}|[0-9A-Fa-f]{12})$'
+        description: Valor hex de 8 ou 12 caracteres representando o par (mark, space).
+      example:
+        "0": "01CB8269"
+        "1": "05FE8269"
+        H: "10DF917C"
+        F: "0000826C"
+        G: "1406826C"
+
+    IRCommands:
+      type: object
+      description: |
+        Dicionário de comandos do protocolo IR. Cada chave é o ID numérico do estado da máquina (como string decimal) e o valor é o bytecode do comando codificado em Base64.
+
+        O ID numérico codifica o estado completo da máquina:  
+        id = (power × 7680) + ((temp − 16) × 480) + (mode × 80) + (fan × 16) + (swingV × 8) + (swingH × 4) + (sleep × 2) + fast
+      additionalProperties:
+        type: string
+        format: byte
+        description: Bytecode do comando IR codificado em Base64.
+      example:
+        "848": "Af4wsk17hOAfAgH+MLJNe4TgHwM="
+        "8736": "Af4wsk2fYBDvAgH+MLJNn2AQ7wM="
+        "8752": "Af4wsk1foBDvAgH+MLJNX6AQ7wM="
+
+    IRProtocol:
+      type: object
+      description: Protocolo infravermelho completo utilizado pelo dispositivo para controlar a máquina de Ar Condicionado.
+      properties:
+        id:
+          type: integer
+          description: Identificador numérico do protocolo.
+          example: 1
+        brand:
+          type: string
+          description: Nome do fabricante do protocolo.
+          example: "Midea"
+        maxlen:
+          type: integer
+          description: Comprimento máximo em bytes do bytecode de qualquer comando deste protocolo.
+          example: 20
+        timings:
+          $ref: "#/components/schemas/IRTimings"
+        commands:
+          $ref: "#/components/schemas/IRCommands"
+
+    IRRawFrame:
+      type: object
+      description: |
+        Frame infravermelho bruto no formato de stream RMT, codificado em Base64.
+
+        Cada item do stream ocupa 4 bytes (big-endian):
+        - Bits 0–14: duração do pulso (mark) em ticks do RMT.
+        - Bit 15: nível lógico do mark (sempre 1 no periférico RMT).
+        - Bits 16–30: duração do espaço (space).
+        - Space = 0 indica formato mega (gap longo ≥ 32.768 µs); o próximo item contém o espaço real em 31 bits.
+      required:
+        - bs
+      properties:
+        bs:
+          type: string
+          format: byte
+          description: Stream RMT bruto codificado em Base64.
+          example: "EQBJ/xEASf8RAEn/EQBJABEASf8="
+
+    IRCapturedCommand:
+      type: object
+      description: |
+        Último frame IR capturado, no formato selecionado via `?type=` em `GET /protocol/cmd`. Exatamente uma das
+        propriedades é retornada por vez, conforme o `type` solicitado:
+        - `bs` (padrão): stream RMT bruto em Base64 — ver `IRRawFrame`.
+        - `raw`: payload decodificado em hexadecimal, no mesmo formato da coluna `payload_raw` da base de protocolos.
+        - `b64`: payload decodificado em Base64, no mesmo formato da coluna `payload_b64` da base de protocolos.
+
+        A decodificação (`raw`/`b64`) infere os timings exclusivamente a partir dos pulsos deste comando capturado,
+        por proximidade percentual — nunca a partir de um protocolo eventualmente já carregado no dispositivo.
+      properties:
+        bs:
+          type: string
+          format: byte
+          description: Presente quando `type=bs` (padrão). Stream RMT bruto codificado em Base64.
+          example: "EQBJ/xEASf8RAEn/EQBJABEASf8="
+        payload_raw:
+          type: string
+          description: Presente quando `type=raw`. Payload decodificado, em hexadecimal.
+          example: "0100AB01FE08D500"
+        payload_b64:
+          type: string
+          format: byte
+          description: Presente quando `type=b64`. Payload decodificado, em Base64.
+          example: "AQCrAf4I1QA="
