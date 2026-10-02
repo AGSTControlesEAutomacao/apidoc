@@ -3520,14 +3520,17 @@ paths:
         - Protocolo IR
       summary: Capturar Frame IR Bruto 🚩Adicionado
       description: |
-        Lê o último frame infravermelho capturado pelo sensor do dispositivo, retornando o stream RMT bruto codificado em Base64.
+        Lê o último frame infravermelho capturado pelo sensor do dispositivo.
 
         Utilizado durante o processo de aprendizado de protocolo: o técnico aponta o controle remoto físico para o dispositivo e pressiona um botão; em seguida chama este endpoint para obter o sinal capturado.
 
-        O stream Base64 retornado no campo `bs` representa uma sequência de itens RMT (4 bytes cada, big-endian):
-        - Bits 0–14: duração do pulso (mark) em ticks do periférico RMT.
-        - Bits 16–30: duração do espaço (space).
-        - Space = 0 indica formato mega (gap longo), com o próximo item contendo o espaço real em 31 bits.
+        O parâmetro `type` seleciona o formato da resposta:
+        - **`bs`** (padrão): stream RMT bruto codificado em Base64. Representa uma sequência de itens RMT (4 bytes cada, big-endian):
+          - Bits 0–14: duração do pulso (mark) em ticks do periférico RMT.
+          - Bits 16–30: duração do espaço (space).
+          - Space = 0 indica formato mega (gap longo), com o próximo item contendo o espaço real em 31 bits.
+        - **`raw`**: payload já decodificado pelo dispositivo, em hexadecimal — mesmo formato da coluna `payload_raw` da base de protocolos, pronto para busca por igualdade.
+        - **`b64`**: payload já decodificado pelo dispositivo, em Base64 — mesmo formato da coluna `payload_b64` da base de protocolos (mais econômico em banda que `raw`, ao custo de processamento no dispositivo).
       operationId: captureIRCmd
       security:
         - bearerAuth: []
@@ -3539,23 +3542,60 @@ paths:
             type: string
           description: Número de série do dispositivo.
           example: "200000"
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [bs, raw, b64]
+            default: bs
+          description: Formato da resposta desejado.
       responses:
         "200":
           description: Frame IR capturado com sucesso.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/IRRawFrame"
+                $ref: "#/components/schemas/IRCapturedCommand"
               examples:
-                frame:
+                bruto:
+                  summary: "type=bs (padrão)"
                   value:
                     bs: "EQBJ/xEASf8RAEn/EQBJABEASf8="
+                decodificado_hex:
+                  summary: type=raw
+                  value:
+                    payload_raw: "0100AB01FE08D500"
+                decodificado_b64:
+                  summary: type=b64
+                  value:
+                    payload_b64: "AQCrAf4I1QA="
+        "400":
+          description: Valor de `type` inválido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                tipo_invalido:
+                  value:
+                    error: INVALID_TYPE
         "401":
           description: Token ausente ou inválido.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: O sinal capturado não pôde ser decodificado com confiança pelo dispositivo (por exemplo, ruído ou menos de 2 candidatos a bit de dados). Só ocorre com `type=raw` ou `type=b64`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                falha_decode:
+                  value:
+                    error: DECODE_FAILED
         "503":
           description: Nenhum sinal IR disponível — timeout aguardando captura no dispositivo.
           content:
@@ -3576,7 +3616,7 @@ paths:
 
         Utilizado para verificação e teste durante o processo de aprendizado de protocolo: o técnico envia o sinal capturado de volta ao dispositivo para confirmar que o AC responde corretamente.
 
-        O campo `bs` deve conter o mesmo formato de stream RMT retornado por `GET /protocol/cmd/{device}`.
+        O campo `bs` deve conter o mesmo formato de stream RMT retornado por `GET /protocol/cmd/{device}` (`type=bs`, padrão).
       operationId: playIRCmd
       security:
         - bearerAuth: []
@@ -4258,3 +4298,31 @@ components:
           format: byte
           description: Stream RMT bruto codificado em Base64.
           example: "EQBJ/xEASf8RAEn/EQBJABEASf8="
+
+    IRCapturedCommand:
+      type: object
+      description: |
+        Último frame IR capturado pelo dispositivo, no formato selecionado via `?type=` em `GET /protocol/cmd/{device}`.
+        Exatamente uma das propriedades é retornada por vez, conforme o `type` solicitado:
+        - `bs` (padrão): stream RMT bruto em Base64 — ver `IRRawFrame`.
+        - `raw`: payload decodificado em hexadecimal, no mesmo formato da coluna `payload_raw` da base de protocolos.
+        - `b64`: payload decodificado em Base64, no mesmo formato da coluna `payload_b64` da base de protocolos.
+
+        A decodificação (`raw`/`b64`) é feita pelo dispositivo, que infere os timings exclusivamente a partir dos
+        pulsos deste comando capturado, por proximidade percentual — nunca a partir de um protocolo eventualmente
+        já carregado nele.
+      properties:
+        bs:
+          type: string
+          format: byte
+          description: Presente quando `type=bs` (padrão). Stream RMT bruto codificado em Base64.
+          example: "EQBJ/xEASf8RAEn/EQBJABEASf8="
+        payload_raw:
+          type: string
+          description: Presente quando `type=raw`. Payload decodificado, em hexadecimal.
+          example: "0100AB01FE08D500"
+        payload_b64:
+          type: string
+          format: byte
+          description: Presente quando `type=b64`. Payload decodificado, em Base64.
+          example: "AQCrAf4I1QA="
