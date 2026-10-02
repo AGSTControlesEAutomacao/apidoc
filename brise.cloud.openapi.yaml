@@ -1943,17 +1943,15 @@ paths:
 
         > ⚠️ **Privado**: Este endpoint é de uso interno e não deve ser divulgado na documentação pública.
       operationId: getLatestFirmwareVersion
-      security:
-        - bearerAuth: []
       parameters:
         - name: software
           in: query
           required: false
           schema:
             type: string
-            default: "briseii"
-          description: Nome do software a ser consultado. Se não informado, utiliza "briseii" por padrão.
-          example: "briseii"
+            default: "briseII"
+          description: Nome do software a ser consultado. Se não informado, utiliza "briseII" por padrão.
+          example: "briseII"
       responses:
         "200":
           description: Informações da última versão do firmware.
@@ -1965,7 +1963,7 @@ paths:
                   version:
                     type: string
                     description: A versão mais recente do firmware.
-                    example: "3.1.2"
+                    example: "v3.1.2"
                   release_notes:
                     type: string
                     description: Notas de lançamento da versão.
@@ -1992,8 +1990,6 @@ paths:
 
         > ⚠️ **Privado**: Este endpoint é de uso interno e não deve ser divulgado na documentação pública.
       operationId: downloadFirmwareVersion
-      security:
-        - bearerAuth: []
       parameters:
         - name: version
           in: path
@@ -2001,15 +1997,15 @@ paths:
           schema:
             type: string
           description: A versão do firmware solicitada.
-          example: "3.1.2"
+          example: "v3.1.2"
         - name: software
           in: query
           required: false
           schema:
             type: string
-            default: "briseii"
-          description: Nome do software a ser baixado. Se não informado, utiliza "briseii" por padrão.
-          example: "briseii"
+            default: "briseII"
+          description: Nome do software a ser baixado. Se não informado, utiliza "briseII" por padrão.
+          example: "briseII"
       responses:
         "200":
           description: Arquivo binário do firmware baixado com sucesso.
