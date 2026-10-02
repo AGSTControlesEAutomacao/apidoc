@@ -3339,7 +3339,7 @@ paths:
     get:
       tags:
         - Protocolo IR
-      summary: Ler Protocolo IR 🚩Adicionado
+      summary: Protocolo IR 🚩Adicionado
       description: |
         Retorna o protocolo infravermelho atualmente armazenado na memória não volátil do dispositivo.
 
@@ -3399,7 +3399,7 @@ paths:
     post:
       tags:
         - Protocolo IR
-      summary: Gravar Protocolo IR 🚩Adicionado
+      summary: Protocolo IR 🚩Adicionado
       description: |
         Grava o protocolo infravermelho na memória não volátil do dispositivo.
 
@@ -3518,7 +3518,7 @@ paths:
     get:
       tags:
         - Protocolo IR
-      summary: Capturar Frame IR Bruto 🚩Adicionado
+      summary: Capturar IR 🚩Adicionado
       description: |
         Lê o último frame infravermelho capturado pelo sensor do dispositivo.
 
@@ -3610,7 +3610,7 @@ paths:
     post:
       tags:
         - Protocolo IR
-      summary: Reproduzir Frame IR Bruto 🚩Adicionado
+      summary: Reproduzir IR 🚩Adicionado
       description: |
         Emite um frame infravermelho arbitrário pelo emissor do dispositivo.
 
