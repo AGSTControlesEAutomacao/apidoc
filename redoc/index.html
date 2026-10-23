@@ -24,25 +24,55 @@
 </head>
 
 <body>
-	<redoc></redoc>
-	<script src="https://cdn.jsdelivr.net/npm/redoc@2.5.4/bundles/redoc.standalone.js"></script>
-	<script>
-		// Função para obter o parâmetro 'spec' da URL
-		function getUrlParameter(name) {
-			name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
-			var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
-			var results = regex.exec(location.search);
-			return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
-		};
+	<div id="redoc-container"></div>
 
-		const specUrl = getUrlParameter('spec') || '../brise.cloud.openapi.yaml'; // Usa o parâmetro ou o padrão
+	<script type="module">
+		import { init } from 'https://cdn.jsdelivr.net/npm/redoc@3.0.1/bundles/redoc.standalone.js';
 
-		Redoc.init(specUrl, {
-			theme: {
-				logo: {
-					maxHeight: '380px'
+		const urlParams = new URLSearchParams(window.location.search);
+		const specUrl   = urlParams.get('spec')      || '../brise.cloud.openapi.yaml';
+		// colorMode passado pelo pai na carga inicial; padrao: 'system'
+		let   colorMode = urlParams.get('colorMode') || 'system';
+
+		// Chave do localStorage usada internamente pelo Redoc 3.x
+		const COLOR_KEY = 'redoc.colorMode';
+
+		// Inicializa o Redoc
+		await init(specUrl, { colorMode }, document.getElementById('redoc-container'));
+
+		// ── Notifica o frame pai quando o usuario muda o tema pelo switch do Redoc ──
+		// O Redoc grava a preferencia em localStorage['redoc.colorMode']. Observamos essa chave e avisamos o pai via postMessage (sem reload).
+		let lastColorMode = localStorage.getItem(COLOR_KEY) || colorMode;
+
+		function notifyParentIfChanged() {
+			const current = localStorage.getItem(COLOR_KEY) || colorMode;
+			if (current !== lastColorMode) {
+				lastColorMode = current;
+				if (window.parent && window.parent !== window) {
+					window.parent.postMessage({ type: 'colorModeChanged', colorMode: current }, '*');
 				}
 			}
+		}
+
+		// MutationObserver no <html>: Redoc 3.x altera atributos ao trocar tema
+		const observer = new MutationObserver(notifyParentIfChanged);
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['data-color-mode', 'class', 'color-scheme']
+		});
+
+		// Fallback via polling
+		setInterval(notifyParentIfChanged, 500);
+
+		// ── Escuta pedido do pai para trocar colorMode SEM reload de pagina ──
+		// O pai envia postMessage({type: 'setColorMode', colorMode: 'dark'|'light'|'system'}) e o Redoc e re-inicializado no mesmo container (re-renderização React, sem requisicao da HTML).
+		window.addEventListener('message', async function (e) {
+			if (!e.data || e.data.type !== 'setColorMode') return;
+			colorMode = e.data.colorMode || 'system';
+			lastColorMode = colorMode; // evita notificacao redundante de volta ao pai
+			const container = document.getElementById('redoc-container');
+			container.innerHTML = ''; // limpa antes de re-renderizar
+			await init(specUrl, { colorMode }, container);
 		});
 	</script>
 

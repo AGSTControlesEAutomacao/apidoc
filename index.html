@@ -9,6 +9,13 @@
         body {
             margin: 0;
             font-family: Arial, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Dark mode – reativo ao switch do Redoc, sem switch próprio */
+        body.dark-mode {
+            background-color: #1a1a2e;
+            color: #e0e0e0;
         }
 
         .navbar {
@@ -23,6 +30,12 @@
             justify-content: space-between;
             padding: 0 20px;
             z-index: 1000;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        body.dark-mode .navbar {
+            background-color: #16213e;
+            border-bottom-color: #0f3460;
         }
 
         .left-section {
@@ -56,6 +69,9 @@
         .nav-links a:hover {
             background-color: #e9e9e9;
         }
+
+        body.dark-mode .nav-links a { color: #c9d1d9; }
+        body.dark-mode .nav-links a:hover { background-color: #0f3460; }
 
         .nav-links a.active-link::after {
             content: '';
@@ -139,7 +155,7 @@
 <body>
     <div class="navbar">
         <div class="left-section">
-            <img src="logo.svg" alt="Logo da API REST Brise">
+            <img id="navbarLogo" src="logo_light.svg" alt="Logo da API REST Brise">
             <div class="nav-links">
                 <a href="javascript:void(0)" onclick="loadPage('cloud', this)">Cloud API</a>
                 <a href="javascript:void(0)" onclick="loadPage('lan', this)">LAN API</a>
@@ -152,7 +168,7 @@
     </div>
 
     <div id="logo" class="logo-container">
-        <img src="logo.svg" alt="Logo da API REST Brise">
+        <img id="centerLogo" src="logo_light.svg" alt="Logo da API REST Brise">
     </div>
 
     <iframe id="content" class="content" style="display:none;"></iframe>
@@ -161,6 +177,40 @@
         let activeApiType = '';
         let activeLink = null;
 
+        /* ── Reactive theme ──────────── */
+        const COLOR_KEY = 'redoc.colorMode';  // Chave que o Redoc 3.x usa para persistir a preferencia de cor.
+
+        // Estado atual do modo de cor; lido do localStorage na inicializacao.
+        let currentColorMode = localStorage.getItem(COLOR_KEY) || 'system';
+
+        function applyThemeToParent(colorMode) {
+            const isDark = colorMode === 'dark' ||
+                (colorMode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            document.body.classList.toggle('dark-mode', isDark);
+            const logoSrc = isDark ? 'logo_dark.svg' : 'logo_light.svg';
+            document.getElementById('navbarLogo').src = logoSrc;
+            document.getElementById('centerLogo').src  = logoSrc;
+            currentColorMode = colorMode;
+        }
+
+        // Aplica o tema salvo ao carregar a pagina
+        applyThemeToParent(currentColorMode);
+
+        // Escuta mudancas do switch do Redoc notificadas via postMessage
+        window.addEventListener('message', function (e) {
+            if (e.data && e.data.type === 'colorModeChanged') {
+                applyThemeToParent(e.data.colorMode || 'system');
+            }
+        });
+
+        // Acompanha mudanca de preferencia do sistema quando colorMode = 'system'
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+            if (currentColorMode === 'system' || !currentColorMode) {
+                applyThemeToParent('system');
+            }
+        });
+
+        /* ── Page loading ───────────────────────────────────────────── */
         function loadPage(apiType, clickedElement) {
             document.getElementById("logo").style.display = "none";
             document.getElementById("content").style.display = "block";
@@ -185,19 +235,21 @@
 
             const toggleBtn = document.getElementById('toggleBtn');
             const isRedoc = toggleBtn.checked;
+            // Passa colorMode na URL apenas na carga inicial do iframe
+            const cm = currentColorMode;
 
             let pageUrl;
             if (isRedoc) {
                 if (activeApiType === 'cloud') {
-                    pageUrl = 'redoc/index.html?spec=../brise.cloud.openapi.yaml';
+                    pageUrl = `redoc/index.html?spec=../brise.cloud.openapi.yaml&colorMode=${cm}`;
                 } else if (activeApiType === 'lan') {
-                    pageUrl = 'redoc/index.html?spec=../brise.lan.openapi.yaml';
+                    pageUrl = `redoc/index.html?spec=../brise.lan.openapi.yaml&colorMode=${cm}`;
                 }
             } else {
                 if (activeApiType === 'cloud') {
-                    pageUrl = 'rapidoc/index.html?spec=../brise.cloud.openapi.yaml';
+                    pageUrl = `rapidoc/index.html?spec=../brise.cloud.openapi.yaml&colorMode=${cm}`;
                 } else if (activeApiType === 'lan') {
-                    pageUrl = 'rapidoc/index.html?spec=../brise.lan.openapi.yaml';
+                    pageUrl = `rapidoc/index.html?spec=../brise.lan.openapi.yaml&colorMode=${cm}`;
                 }
             }
 
