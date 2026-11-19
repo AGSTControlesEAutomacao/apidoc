@@ -798,6 +798,97 @@ paths:
                   value:
                     error: SYSTEM_BUSY
 
+  /access/owner:
+    post:
+      tags:
+        - Acesso
+      summary: Resgate de Propriedade 🚩Adicionado
+      description: |
+        Permite resgatar ou registrar a propriedade do dispositivo sem a necessidade de reconfigurar ou trocar a rede Wi-Fi.
+
+        Este endpoint é aceito exclusivamente enquanto o dispositivo estiver no estado de provisionamento (**PROVISIONING**), ou seja, sem uma chave privada gerada ou configurada.
+
+        Cenários de utilização:
+        - Falha grave no armazenamento interno (*drive storage*) no arquivo que armazena a chave privada.
+        - Casos em que a chave privada ainda não foi gerada durante a configuração de rede via `POST /network/wifi`.
+        - Resgate da propriedade do dispositivo já conectado à rede local.
+
+        Após o resgate bem-sucedido, a chave privada é registrada e um Access Token com papel de proprietário (`owner`) é gerado e retornado para utilização nas requisições autenticadas subsequentes.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - owner_id
+              properties:
+                owner_id:
+                  type: string
+                  format: uuid
+                  description: Identificador UUID do usuário que assumirá o papel de proprietário (`owner`).
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        "200":
+          description: |
+            Propriedade do dispositivo resgatada com sucesso.
+
+            Retorna o Access Token com privilégios de proprietário (`owner`), que deverá ser utilizado no cabeçalho `Authorization` das requisições autenticadas subsequentes.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - access_token
+                properties:
+                  success:
+                    type: boolean
+                    description: Indica se o resgate da propriedade foi realizado com sucesso.
+                    example: true
+                  access_token:
+                    type: string
+                    description: Access Token com papel de proprietário (`owner`) para autenticar requisições subsequentes no dispositivo.
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              examples:
+                sucesso:
+                  summary: Exemplo de sucesso
+                  value:
+                    success: true
+                    access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        "400":
+          description: Requisição inválida (corpo malformado ou `owner_id` ausente/inválido).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                requisicao_invalida:
+                  value:
+                    error: INVALID_REQUEST
+        "403":
+          description: |
+            Operação não permitida. O dispositivo não está no estado de provisionamento (`PROVISIONING`), já possuindo uma chave privada e proprietário configurados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                negado:
+                  value:
+                    error: ACCESS_DENIED
+        "500":
+          description: Falha interna ao persistir as credenciais na memória não volátil (NVS/storage).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                falha_nvs:
+                  value:
+                    error: NVS_WRITE_ERROR
+
   /access/vouchers:
     post:
       tags:
@@ -2200,7 +2291,7 @@ components:
         - `operator`: `viewer` + envio de comandos de controle.
         - `manager`: `operator` + rotinas, configuração e geração de vouchers.
 
-        O papel `owner`, obtido no provisionamento (`POST /network/wifi`), acumula todos os privilégios de `manager` mais a gestão de acessos; não pode ser concedido por voucher.
+        O papel `owner`, obtido no provisionamento (`POST /network/wifi` ou `POST /access/owner`), acumula todos os privilégios de `manager` mais a gestão de acessos; não pode ser concedido por voucher.
       example: operator
 
     Voucher:
