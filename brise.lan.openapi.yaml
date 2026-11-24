@@ -1601,7 +1601,7 @@ paths:
     get:
       tags:
         - Protocolo IR
-      summary: Protocolo IR
+      summary: Protocolo IR ✏️Alterado
       description: |
         Retorna o protocolo infravermelho atualmente armazenado na memória não volátil do dispositivo.
 
@@ -1621,7 +1621,9 @@ paths:
                   summary: Protocolo Midea (parcial)
                   value:
                     id: 111
-                    brand: "Midea_PeD"
+                    brand: "Midea"
+                    brand_id: 1
+                    parent_id: 10
                     maxlen: 20
                     timings:
                       "0": "01CB8269"
@@ -1657,7 +1659,7 @@ paths:
     post:
       tags:
         - Protocolo IR
-      summary: Protocolo IR
+      summary: Protocolo IR ✏️Alterado
       description: |
         Grava o protocolo infravermelho na memória não volátil do dispositivo.
 
@@ -1703,7 +1705,9 @@ paths:
                 summary: Upload de protocolo completo
                 value:
                   id: 111
-                  brand: "Midea_PeD"
+                  brand: "Midea"
+                  brand_id: 1
+                  parent_id: 10
                   maxlen: 20
                   timings:
                     "0": "01CB8269"
@@ -1753,11 +1757,64 @@ paths:
                   value:
                     error: NVS_WRITE_ERROR
 
+    delete:
+      tags:
+        - Protocolo IR
+      summary: Protocolo IR 🚩Adicionado
+      description: |
+        Remove o protocolo infravermelho da memória não volátil do dispositivo.
+
+        Após a remoção, o dispositivo não possuirá protocolo IR configurado e não será capaz de controlar a máquina de Ar Condicionado até que um novo protocolo seja gravado.
+      operationId: deleteIRProtocol
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Protocolo IR removido com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "403":
+          description: Acesso negado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                negado:
+                  value:
+                    error: ACCESS_DENIED
+        "404":
+          description: Nenhum protocolo IR configurado no dispositivo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                sem_protocolo:
+                  value:
+                    error: PROTOCOL_NOT_FOUND
+        "500":
+          description: Falha ao remover o protocolo da memória não volátil.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                falha_nvs:
+                  value:
+                    error: NVS_WRITE_ERROR
+
   /protocol/cmd:
     get:
       tags:
-        - Protocolo IR
-      summary: Capturar IR
+        - Protocolo IR 
+      summary: Capturar IR ✏️Alterado
       description: |
         Lê o último frame infravermelho capturado pelo sensor do dispositivo.
 
@@ -1793,15 +1850,24 @@ paths:
                 bruto:
                   summary: "type=bs (padrão)"
                   value:
+                    timestamp: 1761906135
                     bs: "EQBJ/xEASf8RAEn/EQBJABEASf8="
                 decodificado_hex:
                   summary: type=raw
                   value:
+                    timestamp: 1761906135
                     payload_raw: "0100AB01FE08D500"
                 decodificado_b64:
                   summary: type=b64
                   value:
-                    payload_b64: "AQCrAf4I1QA="
+                    timestamp: 1791486737
+                    payload_b64: "Af4wsk1foOQbAgH+MLJNX6DkGwM="
+                    timings:
+                      "0": "01F5823D"
+                      "1": "062D8239"
+                      F: "0000824E"
+                      G: "143F8233"
+                      H: "11149150"
         "400":
           description: Valor de `type` inválido.
           content:
@@ -2387,6 +2453,14 @@ components:
           type: string
           description: Nome do fabricante do protocolo.
           example: "Midea"
+        brand_id:
+          type: integer
+          description: Identificador numérico do fabricante do protocolo.
+          example: 1
+        parent_id:
+          type: integer
+          description: Identificador do protocolo pai, quando este protocolo é derivado de outro.
+          example: 5
         maxlen:
           type: integer
           description: Comprimento máximo em bytes do bytecode de qualquer comando deste protocolo.
@@ -2426,7 +2500,18 @@ components:
 
         A decodificação (`raw`/`b64`) infere os timings exclusivamente a partir dos pulsos deste comando capturado,
         por proximidade percentual — nunca a partir de um protocolo eventualmente já carregado no dispositivo.
+
+        O campo `timestamp` é sempre retornado, independente do `type`, e reflete o momento exato da captura do
+        sinal — permite ao cliente (App) identificar uma leitura nova mesmo quando o conteúdo do sinal for
+        idêntico ao anterior (ex.: aparelhos com infravermelho do tipo toggle).
+      required:
+        - timestamp
       properties:
+        timestamp:
+          type: integer
+          format: int64
+          description: Timestamp epoch (UTC, em segundos) do momento da captura do sinal.
+          example: 1761906135
         bs:
           type: string
           format: byte
