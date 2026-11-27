@@ -67,6 +67,9 @@ tags:
   - name: Protocolo IR
     description: |
       Gerenciamento do protocolo infravermelho utilizado pelo dispositivo para interfacear com a máquina de Ar Condicionado.
+  - name: Sensores
+    description: |
+      Consulta às informações e medições dos sensores do dispositivo Brise, permitindo o monitoramento e a análise de suas condições de funcionamento.
 
 paths:
   /network:
@@ -1511,6 +1514,143 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /sensors/thermaltrend:
+    get:
+      tags:
+        - Sensores
+      summary: Tendência Térmica 🚩Adicionado
+      description: |
+        Retorna os dados da análise de tendência térmica do ambiente e de desempenho da climatização do dispositivo.
+
+        ### Funcionamento da Análise
+
+        #### 1. Tendência Térmica Geral (`ThermalTrend`)
+        - Opera sobre uma janela móvel com as últimas 30 amostras de temperatura (`ThermalSamples`), recalculada a cada nova amostra.
+        - Não depende do estado ou das alterações da climatização.
+        - Classificação da tendência: `THERMAL_TREND_COOLING` (refrigerando), `THERMAL_TREND_STABLE` (estável) ou `THERMAL_TREND_HEATING` (aquecendo). Permanece `THERMAL_TREND_UNKNOWN` até completar as 30 amostras.
+
+        #### 2. Desempenho Térmico (`ThermalPerformance`)
+        - Possui seu próprio ciclo de análise dentro do mesmo buffer de amostras (últimas N amostras desde o início do ciclo).
+        - O ciclo é reiniciado (`ThermalPerformanceSamples` retorna a 0) sempre que houver alteração de ligado/desligado, modo de operação, setpoint ou velocidade do ventilador, por qualquer origem.
+        - Enquanto a nova janela estiver em andamento (amostras < 30), são calculados a tendência parcial (`ThermalPerformancePartialTrend`) e o slope parcial (`ThermalPerformancePartialSlope`).
+        - Ao completar 30 amostras no ciclo, a avaliação é consolidada:
+          - **`THERMAL_PERFORMANCE_UNKNOWN`**: Dispositivo desligado, sem vibração detectada, modo de operação fora de COOL/HEAT ou estado do AC desconhecido.
+          - **`THERMAL_PERFORMANCE_NORMAL`**: Temperatura dentro da faixa do setpoint (±`SetpointTolerance`) ou tendência compatível com a climatização esperada (modo COOL com `COOLING`, ou modo HEAT com `HEATING`). Reseta `ConsecutiveFailureCount` para 0.
+          - **`THERMAL_PERFORMANCE_INSUFFICIENT`**: Tendência térmica estável (`STABLE`) ou na direção oposta ao modo (ex.: aquecendo em modo COOL). Incrementa o contador `ConsecutiveFailureCount`.
+          - **`THERMAL_PERFORMANCE_BAD`**: Atribuído automaticamente quando `ConsecutiveFailureCount` atinge o limite configurado (`ThermalPerformanceFailureLimit`, padrão 12 janelas consecutivas, aprox. 60 min).
+      operationId: getThermalTrend
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Dados atuais da análise de tendência e desempenho térmico.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThermalTrendStatus"
+              examples:
+                exemplo_status:
+                  summary: Exemplo de status da tendência térmica
+                  value:
+                    ConsecutiveFailureCount: 1
+                    Parameters:
+                      SetpointTolerance: 1.0
+                      ThermalPerformanceFailureLimit: 12
+                      ThermalTrendSlopeThreshold: 0.11999999731779099
+                    ThermalPerformance: "THERMAL_PERFORMANCE_INSUFFICIENT"
+                    ThermalPerformancePartialSlope: -0.2011176198720932
+                    ThermalPerformancePartialTrend: "THERMAL_TREND_COOLING"
+                    ThermalPerformanceSamples: 9
+                    ThermalPerformanceTrend: "THERMAL_TREND_STABLE"
+                    ThermalPerformanceTrendSlope: -0.05263347923755646
+                    ThermalSamples:
+                      - 25.694549560546875
+                      - 25.694549560546875
+                      - 25.694549560546875
+                      - 25.427001953125
+                      - 25.400299072265625
+                      - 25.400299072265625
+                      - 25.32012939453125
+                      - 25.4537353515625
+                      - 25.58746337890625
+                      - 25.58746337890625
+                      - 25.7213134765625
+                      - 25.774871826171875
+                      - 25.8284912109375
+                      - 25.98944091796875
+                      - 25.85528564453125
+                      - 25.774871826171875
+                      - 25.774871826171875
+                      - 25.7213134765625
+                      - 25.774871826171875
+                      - 25.85528564453125
+                      - 25.85528564453125
+                      - 25.96258544921875
+                      - 26.016265869140625
+                      - 25.908935546875
+                      - 25.96258544921875
+                      - 25.96258544921875
+                      - 25.74810791015625
+                      - 25.74810791015625
+                      - 25.774871826171875
+                      - 25.774871826171875
+                    ThermalTrend: "THERMAL_TREND_STABLE"
+                    ThermalTrendSlope: 0.08266685158014297
+        "403":
+          description: O usuário autenticado não possui permissão para acessar.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      tags:
+        - Dispositivo
+      summary: Configura Tendência Térmica 🚩Adicionado
+      description: |
+        Altera os parâmetros de configuração da análise de tendência e desempenho térmico.
+
+        O envio de cada chave é opcional. Se a chave não for enviada, o valor correspondente não será alterado.
+      operationId: updateThermalTrend
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ThermalTrendConfig"
+            examples:
+              configuracao_padrao:
+                summary: Configuração com valores padrão
+                value:
+                  SetpointTolerance: 1.0
+                  ThermalTrendSlopeThreshold: 0.12
+                  ThermalPerformanceFailureLimit: 12
+      responses:
+        "200":
+          description: Configurações atualizadas com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        "400":
+          description: Requisição inválida (parâmetros fora das faixas permitidas).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Acesso negado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /config:
     get:
       tags:
@@ -2136,6 +2276,172 @@ components:
           type: boolean
           description: "Confirmação por sensor de que a máquina realmente encontra-se ligada (true) ou desligada (false)"
           example: true
+
+    ThermalTrendConfig:
+      type: object
+      description: |
+        Parâmetros de configuração para a análise de tendência térmica e avaliação de desempenho da climatização.
+      properties:
+        SetpointTolerance:
+          type: number
+          minimum: 0
+          maximum: 10
+          default: 1.0
+          description: |
+            Tolerância em relação ao setpoint para considerar o desempenho como normal (°C).
+            Faixa: 0 a 10 °C.
+          example: 1.0
+        ThermalTrendSlopeThreshold:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 10
+          default: 0.12
+          description: |
+            Limiar de inclinação da reta (|slope| em °C/min) para classificação da tendência térmica (`THERMAL_TREND_COOLING`, `THERMAL_TREND_STABLE`, `THERMAL_TREND_HEATING`).
+            Faixa: maior que 0 até 10 °C/min.
+          example: 0.12
+        ThermalPerformanceFailureLimit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 12
+          description: |
+            Quantidade máxima de janelas consecutivas com desempenho insuficiente antes de transitar o status para `THERMAL_PERFORMANCE_BAD`.
+            Faixa: inteiro de 1 a 1000.
+          example: 12
+
+    ThermalTrendStatus:
+      type: object
+      description: |
+        Leituras e dados analíticos da tendência térmica e desempenho da climatização do dispositivo.
+      required:
+        - ConsecutiveFailureCount
+        - Parameters
+        - ThermalPerformance
+        - ThermalPerformancePartialSlope
+        - ThermalPerformancePartialTrend
+        - ThermalPerformanceSamples
+        - ThermalPerformanceTrend
+        - ThermalPerformanceTrendSlope
+        - ThermalSamples
+        - ThermalTrend
+        - ThermalTrendSlope
+      properties:
+        ConsecutiveFailureCount:
+          type: integer
+          minimum: 0
+          description: |
+            Quantidade consecutiva de janelas avaliadas com desempenho térmico insuficiente (`THERMAL_PERFORMANCE_INSUFFICIENT`).
+          example: 1
+        Parameters:
+          $ref: "#/components/schemas/ThermalTrendConfig"
+        ThermalPerformance:
+          type: string
+          enum:
+            - THERMAL_PERFORMANCE_UNKNOWN
+            - THERMAL_PERFORMANCE_NORMAL
+            - THERMAL_PERFORMANCE_INSUFFICIENT
+            - THERMAL_PERFORMANCE_BAD
+          description: |
+            Análise realizada sobre a última janela completa de 30 amostras que define se o ar condicionado está performando de forma normal ou insuficiente:
+            - `THERMAL_PERFORMANCE_UNKNOWN`: Máquina desligada, sem vibração detectada, modo fora de COOL/HEAT ou estado do AC desconhecido.
+            - `THERMAL_PERFORMANCE_NORMAL`: Temperatura dentro da faixa do setpoint (± SetpointTolerance) ou tendência esperada compatível com o modo ativo (COOL com COOLING ou HEAT com HEATING). Reseta `ConsecutiveFailureCount` para 0.
+            - `THERMAL_PERFORMANCE_INSUFFICIENT`: Tendência térmica estável (`STABLE`) ou na direção oposta ao modo de operação. Incrementa `ConsecutiveFailureCount`.
+            - `THERMAL_PERFORMANCE_BAD`: Adotado quando `ConsecutiveFailureCount` atinge o limite configurado (`ThermalPerformanceFailureLimit`, padrão 12 janelas consecutivas).
+          example: "THERMAL_PERFORMANCE_INSUFFICIENT"
+        ThermalPerformancePartialSlope:
+          type: number
+          description: |
+            Inclinação da reta (slope em °C/min) calculada sobre os valores disponíveis na nova janela em andamento.
+          example: -0.2011176198720932
+        ThermalPerformancePartialTrend:
+          type: string
+          enum:
+            - THERMAL_TREND_UNKNOWN
+            - THERMAL_TREND_COOLING
+            - THERMAL_TREND_STABLE
+            - THERMAL_TREND_HEATING
+          description: |
+            Análise que define se a climatização está refrigerando, aquecendo ou estável, calculada sobre os valores disponíveis na nova janela em andamento.
+          example: "THERMAL_TREND_COOLING"
+        ThermalPerformanceSamples:
+          type: integer
+          minimum: 0
+          maximum: 30
+          description: |
+            Quantidade de amostras coletadas para definir a janela de análise de desempenho do ciclo atual (0 a 30).
+            O ciclo é reiniciado sempre que houver alteração de ligado/desligado, modo, setpoint ou velocidade do ventilador, qualquer que seja a origem.
+          example: 9
+        ThermalPerformanceTrend:
+          type: string
+          enum:
+            - THERMAL_TREND_UNKNOWN
+            - THERMAL_TREND_COOLING
+            - THERMAL_TREND_STABLE
+            - THERMAL_TREND_HEATING
+          description: |
+            Análise que define se a climatização estava refrigerando, aquecendo ou estável, calculada sobre a última janela completa de 30 amostras.
+          example: "THERMAL_TREND_STABLE"
+        ThermalPerformanceTrendSlope:
+          type: number
+          description: |
+            Inclinação da reta (slope em °C/min) calculada sobre a última janela completa de análise de desempenho.
+          example: -0.05263347923755646
+        ThermalSamples:
+          type: array
+          description: |
+            Últimos 30 valores de temperatura disponíveis para análise (°C).
+          items:
+            type: number
+          maxItems: 30
+          example:
+            - 25.694549560546875
+            - 25.694549560546875
+            - 25.694549560546875
+            - 25.427001953125
+            - 25.400299072265625
+            - 25.400299072265625
+            - 25.32012939453125
+            - 25.4537353515625
+            - 25.58746337890625
+            - 25.58746337890625
+            - 25.7213134765625
+            - 25.774871826171875
+            - 25.8284912109375
+            - 25.98944091796875
+            - 25.85528564453125
+            - 25.774871826171875
+            - 25.774871826171875
+            - 25.7213134765625
+            - 25.774871826171875
+            - 25.85528564453125
+            - 25.85528564453125
+            - 25.96258544921875
+            - 26.016265869140625
+            - 25.908935546875
+            - 25.96258544921875
+            - 25.96258544921875
+            - 25.74810791015625
+            - 25.74810791015625
+            - 25.774871826171875
+            - 25.774871826171875
+        ThermalTrend:
+          type: string
+          enum:
+            - THERMAL_TREND_UNKNOWN
+            - THERMAL_TREND_COOLING
+            - THERMAL_TREND_STABLE
+            - THERMAL_TREND_HEATING
+          description: |
+            Análise que define se o ambiente está refrigerando, aquecendo ou estável, calculada sobre os últimos 30 valores da janela móvel.
+            Não depende do estado ou das alterações da climatização. Permanece em `THERMAL_TREND_UNKNOWN` até completar as 30 amostras.
+          example: "THERMAL_TREND_STABLE"
+        ThermalTrendSlope:
+          type: number
+          description: |
+            Inclinação da reta (slope em °C/min) calculada sobre os últimos 30 valores de temperatura.
+          example: 0.08266685158014297
 
     DevicePing:
       type: object
