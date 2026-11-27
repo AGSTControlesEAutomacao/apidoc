@@ -293,6 +293,10 @@ paths:
                   type: string
                   description: 🔑 Identificador do usuário proprietário. Obrigatório no primeiro provisionamento.
                   example: "550e8400-e29b-41d4-a716-446655440000"
+                cloud_mode:
+                  type: boolean
+                  description: "Define se o dispositivo deve operar conectado ao serviço de Cloud (true) ou apenas na rede local (false)."
+                  example: true
       responses:
         "200":
           description: |
@@ -1377,6 +1381,7 @@ paths:
                       absence_timeout: 1800
                       anonymous_control: false
                       auto_clean: false
+                      cloud_mode: true
                       ir_jammer: false
                       light_comfort: false
                       temp_limit: false
@@ -1605,7 +1610,7 @@ paths:
 
     post:
       tags:
-        - Dispositivo
+        - Sensores
       summary: Configura Tendência Térmica 🚩Adicionado
       description: |
         Altera os parâmetros de configuração da análise de tendência e desempenho térmico.
@@ -1655,7 +1660,7 @@ paths:
     get:
       tags:
         - Dispositivo
-      summary: Configurações
+      summary: Configurações ✏️Alterado
       description: Retorna as configurações atuais do dispositivo em relação as funções extras.
       operationId: getDeviceConfig
       security:
@@ -1676,7 +1681,7 @@ paths:
     post:
       tags:
         - Dispositivo
-      summary: Configurações
+      summary: Configurações ✏️Alterado
       description: |
         Altera as configurações do dispositivo.
         O envio de cada chave é opcional. Se a chave não for enviada, o valor correspondente não será alterado.
@@ -2139,6 +2144,10 @@ components:
           type: boolean
           description: "Habilita ou desabilita a funcionalidade de limpeza automática (true: habilitado, false: desabilitado)"
           example: false
+        cloud_mode:
+          type: boolean
+          description: "Define se o dispositivo deve operar conectado ao serviço de Cloud (true) ou apenas na rede local (false)"
+          example: true
         ir_jammer:
           type: boolean
           description: "Emite um sinal de interferência quando detecta um comando de infravermelho (true: habilitado, false: desabilitado)"
